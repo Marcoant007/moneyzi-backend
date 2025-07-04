@@ -1,8 +1,8 @@
-import Fastify from 'fastify'
+import 'dotenv/config'
+import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
-import { redis } from '@infra/cache/redis'
-import { connectRabbitMQ, startConsumer } from '@infra/mensageria/rabbitmq/rabbitmq'
 import { importRoutes } from '@routes/import.route'
+import Fastify from 'fastify'
 
 async function bootstrap() {
     const app = Fastify()
@@ -11,7 +11,6 @@ async function bootstrap() {
     app.register(importRoutes)
 
     await connectRabbitMQ()
-    await redis.connect()
     await startConsumer()
 
     app.listen({ port: 3333 }).then(() => {

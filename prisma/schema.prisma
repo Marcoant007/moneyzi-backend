@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  id             String                     @id @default(uuid())
+  name           String
+  description    String?
+  type           TransactionType
+  amount         Decimal                    @db.Decimal(10, 2)
+  category       TransactionCategory
+  paymentMethod  TransactionPaymentMethod
+  date           DateTime
+  isRecurring    Boolean                    @default(false)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  deletedAt      DateTime?
+  userId         String
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([date])
+  @@index([userId, date])
+  @@index([deletedAt])
+}
+
+enum TransactionType {
+  DEPOSIT
+  EXPENSE
+  INVESTMENT
+}
+
+enum TransactionCategory {
+  HOUSING          @map("housing")
+  TRANSPORTATION   @map("transportation")
+  FOOD             @map("food")
+  ENTERTAINMENT    @map("entertainment")
+  HEALTH           @map("health")
+  UTILITY          @map("utility")
+  SALARY           @map("salary")
+  EDUCATION        @map("education")
+  OTHER            @map("other")
+  SIGNATURE        @map("signature")
+  FOOD_DELIVERY    @map("food_delivery")
+  GAMING           @map("gaming")
+  SERVICES         @map("services")
+  STREAMING        @map("streaming")
+}
+
+enum TransactionPaymentMethod {
+  CREDIT_CARD    @map("credit_card")
+  DEBIT_CARD     @map("debit_card")
+  BANK_TRANSFER  @map("bank_transfer")
+  BANK_SLIP      @map("bank_slip")
+  CASH           @map("cash")
+  PIX            @map("pix")
+  OTHER          @map("other")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String
+  transactions Transaction[]
+}

@@ -1,23 +1,21 @@
-import { publishToQueue } from '@infra/mensageria/rabbitmq/rabbitmq'
+import { publishToQueue } from '@/infra/queue/rabbitmq/rabbitmq'
+import { CsvImportService } from '@/service/csv-import-service'
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
 export async function importRoutes(app: FastifyInstance) {
     app.post('/import-csv', async (request, reply) => {
-        const body = await request.body as any
+        console.log(request)
+        const data = await request.file()
+        const userId = request.headers['x-user-id'] as string
 
-        const schema = z.object({
-            userId: z.string(),
-            csvContent: z.string()
-        })
-
-        const result = schema.safeParse(body)
-        if (!result.success) {
-            return reply.status(400).send({ error: 'Dados inválidos' })
+        if (!data || !userId) {
+            return reply.status(400).send({ error: 'Arquivo ou usuário ausente' })
         }
 
-        publishToQueue(result.data)
+        const buffer = await data.toBuffer()
+        await CsvImportService.import(buffer, userId)
 
-        return reply.status(202).send({ message: 'Arquivo está sendo processado' })
+        return reply.status(202).send({ message: 'Arquivo sendo processado' })
     })
 }

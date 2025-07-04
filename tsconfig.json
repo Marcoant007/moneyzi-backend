@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
+    "baseUrl": "./src",
     "paths": {
-      "@infra/*": ["src/infra/*"],
-      "@routes/*": ["src/routes/*"],
-      "@services/*": ["src/services/*"],
-      "@queue/*": ["src/queue/*"]
+      "@/*": ["*"],
+      "@infra/*": ["infra/*"],
+      "@routes/*": ["routes/*"],
+      "@services/*": ["services/*"],
+      "@queue/*": ["queue/*"]
     }
   }
 }

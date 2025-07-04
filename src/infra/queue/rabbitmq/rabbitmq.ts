@@ -1,3 +1,4 @@
+import { buildTransactionHandlerChain } from '@/core/handlers/build-transaction-handler'
 import * as amqp from 'amqplib'
 
 let channel: amqp.Channel
@@ -22,22 +23,18 @@ export async function startConsumer() {
     if (!channel) throw new Error('Canal do RabbitMQ não inicializado.')
 
     channel.consume(QUEUE_NAME, async (msg) => {
-        if (msg) {
-            const content = msg.content.toString()
-            console.log('📥 Mensagem recebida:', content)
+        if (!msg) return
 
-            try {
-                const data = JSON.parse(content)
-                // Aqui você chama o processador de CSV
-                // Ex: await processCsv(data)
+        const content = msg.content.toString()
+        const data = JSON.parse(content)
 
-                channel.ack(msg)
-            } catch (error) {
-                console.error('❌ Erro ao processar mensagem:', error)
-                channel.nack(msg, false, false) // descarta a mensagem
-            }
-        }
+        const chain = buildTransactionHandlerChain()
+        await chain.handle(data)
+
+        channel.ack(msg)
     })
 
-    console.log('👂 Consumidor escutando a fila')
+    console.log('👂 Consumidor escutando a fila http://localhost:15672')
 }
+
+
