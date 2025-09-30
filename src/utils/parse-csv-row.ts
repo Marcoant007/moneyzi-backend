@@ -1,4 +1,4 @@
-import { ParsedTransaction } from '@/core/interface/transaction-interface'
+import { ParsedTransaction } from '@/core/dtos/parsed-transaction.dto'
 import { TransactionCategory, TransactionPaymentMethod, TransactionType } from '@prisma/client'
 
 export function parseCsvRow(

@@ -1,4 +1,4 @@
-import { ParsedTransaction } from '@/core/interface/transaction-interface'
+import { ParsedTransaction } from '@/core/dtos/parsed-transaction.dto'
 import { parse } from 'csv-parse/sync'
 import { mapHeaders } from './map-headers'
 import { parseCsvRow } from './parse-csv-row'

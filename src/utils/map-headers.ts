@@ -1,4 +1,4 @@
-import { ParsedTransaction } from '@/core/interface/transaction-interface'
+import { ParsedTransaction } from '@/core/dtos/parsed-transaction.dto'
 
 export function mapHeaders(
     headers: string[]

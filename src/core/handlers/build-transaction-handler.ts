@@ -2,7 +2,6 @@ import { TransactionHandler } from '../interface/transaction-handler'
 import { NormalizeDescriptionHandler } from './normalize-description-handler'
 import { OpenAICategorizationHandler } from './openai-categorization-handler'
 import { PersistTransactionHandler } from './persist-transaction-handler'
-import type { Transaction } from '@prisma/client'
 
 export function buildTransactionHandlerChain(): TransactionHandler {
     const normalize = new NormalizeDescriptionHandler()

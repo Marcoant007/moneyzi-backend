@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { CsvImportService } from '@/service/csv-import-service'
+import { ImportService } from '@/service/import-service'
+import { ImportJobDto } from '@/core/dtos/import-job.dto'
 import { FastifyInstance } from 'fastify'
 
 export async function importRoutes(app: FastifyInstance) {
@@ -24,9 +25,35 @@ export async function importRoutes(app: FastifyInstance) {
         }
 
         const buffer = await data.toBuffer()
-        await CsvImportService.import(buffer, userId)
+        try {
+            const parsed = ImportService.parseOnly(buffer)
 
-        return reply.status(202).send({ message: 'Arquivo sendo processado' })
+            const job = await prisma.importJob.create({
+                data: {
+                    userId,
+                    total: parsed.length,
+                    processed: 0,
+                },
+            })
+
+            // publish messages with jobId
+            await ImportService.import(buffer, userId, job.id)
+
+            const dto: ImportJobDto = {
+                id: job.id,
+                userId: job.userId,
+                status: job.status,
+                total: job.total,
+                processed: job.processed,
+                createdAt: job.createdAt,
+                updatedAt: job.updatedAt,
+            }
+
+            return reply.status(202).send({ message: 'Arquivo sendo processado', job: dto })
+        } catch (err) {
+            request.log.error(err)
+            return reply.status(500).send({ error: 'Erro ao iniciar importação' })
+        }
     })
 
     app.get('/dashboard', async (request, reply) => {
@@ -49,6 +76,30 @@ export async function importRoutes(app: FastifyInstance) {
         } catch (err) {
             request.log.error(err)
             return reply.status(500).send({ error: 'Erro ao calcular dashboard' })
+        }
+    })
+
+    // get import job status
+    app.get('/import/:id', async (request, reply) => {
+        const { id } = request.params as { id: string }
+        try {
+            const job = await prisma.importJob.findUnique({ where: { id } })
+            if (!job) return reply.status(404).send({ error: 'Job não encontrado' })
+
+            const dto: ImportJobDto = {
+                id: job.id,
+                userId: job.userId,
+                status: job.status,
+                total: job.total,
+                processed: job.processed,
+                createdAt: job.createdAt,
+                updatedAt: job.updatedAt,
+            }
+
+            return reply.send({ ok: true, job: dto })
+        } catch (err) {
+            request.log.error(err)
+            return reply.status(500).send({ error: 'Erro ao buscar job' })
         }
     })
 }

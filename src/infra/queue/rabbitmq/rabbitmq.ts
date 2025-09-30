@@ -1,5 +1,6 @@
 import { buildTransactionHandlerChain } from '@/core/handlers/build-transaction-handler'
 import * as amqp from 'amqplib'
+import { prisma } from '@/lib/prisma'
 
 let channel: amqp.Channel
 const QUEUE_NAME = 'csv_import'
@@ -29,9 +30,24 @@ export async function startConsumer() {
         const data = JSON.parse(content)
 
         const chain = buildTransactionHandlerChain()
-        await chain.handle(data)
-
-        channel.ack(msg)
+        try {
+            await chain.handle(data)
+            channel.ack(msg)
+        } catch (err) {
+            console.error('Erro processando mensagem da fila:', err)
+            try {
+                const jobId = data.importJobId as string | undefined
+                if (jobId) {
+                    await prisma.importJob.update({
+                        where: { id: jobId },
+                        data: { status: 'FAILED' },
+                    })
+                }
+            } catch (e) {
+                console.warn('Não foi possível atualizar ImportJob para FAILED:', e)
+            }
+            channel.ack(msg)
+        }
     })
 
     console.log('👂 Consumidor escutando a fila http://localhost:15672')
