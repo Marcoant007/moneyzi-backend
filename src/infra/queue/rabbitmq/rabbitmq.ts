@@ -1,33 +1,53 @@
 import { buildTransactionHandlerChain } from '@/core/handlers/build-transaction-handler'
 import * as amqp from 'amqplib'
-import { prisma } from '@/lib/prisma'
+import logger from '@/lib/logger'
+import { getRequiredEnv } from '@/utils/required-env'
+import { TransactionMessage } from '@/core/types/transaction-message'
+import { PrismaImportJobRepository } from '@/infra/repositories/prisma/prisma-import-job-repository'
+import { ImportJobStatus } from '@prisma/client'
 
+let connection: any
 let channel: amqp.Channel
-const QUEUE_NAME = 'csv_import'
+const importJobRepository = new PrismaImportJobRepository()
+
+const QUEUE_NAME = getRequiredEnv('IMPORT_QUEUE_NAME')
+const RABBITMQ_URL = getRequiredEnv('RABBITMQ_URL')
 
 export async function connectRabbitMQ() {
-    const connection = await amqp.connect('amqp://localhost')
-    channel = await connection.createChannel()
-    await channel.assertQueue(QUEUE_NAME)
-    console.log('✅ Conectado ao RabbitMQ')
+    try {
+        const conn = await amqp.connect(RABBITMQ_URL)
+        connection = conn
+        channel = await conn.createChannel()
+        await channel.assertQueue(QUEUE_NAME, { durable: true })
+        if (typeof channel.prefetch === 'function') {
+            channel.prefetch(1)
+        }
+        logger.info({ url: RABBITMQ_URL, queue: QUEUE_NAME }, 'Conectado ao RabbitMQ')
+    } catch (err) {
+        console.error('❌ Erro conectando ao RabbitMQ:', err)
+        throw err
+    }
 }
 
-export function publishToQueue(message: object) {
+export function publishToQueue(message: TransactionMessage) {
     if (!channel) throw new Error('Canal do RabbitMQ não inicializado.')
     channel.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify(message)), {
         persistent: true
     })
-    console.log('📤 Mensagem publicada na fila')
+    logger.debug({ queue: QUEUE_NAME }, 'Mensagem publicada na fila')
 }
 
 export async function startConsumer() {
     if (!channel) throw new Error('Canal do RabbitMQ não inicializado.')
-
     channel.consume(QUEUE_NAME, async (msg) => {
         if (!msg) return
 
         const content = msg.content.toString()
-        const data = JSON.parse(content)
+        const data: TransactionMessage = JSON.parse(content)
+
+        if (data.date && typeof data.date === 'string') {
+            data.date = new Date(data.date)
+        }
 
         const chain = buildTransactionHandlerChain()
         try {
@@ -38,10 +58,7 @@ export async function startConsumer() {
             try {
                 const jobId = data.importJobId as string | undefined
                 if (jobId) {
-                    await prisma.importJob.update({
-                        where: { id: jobId },
-                        data: { status: 'FAILED' },
-                    })
+                    await importJobRepository.markStatus(jobId, ImportJobStatus.FAILED)
                 }
             } catch (e) {
                 console.warn('Não foi possível atualizar ImportJob para FAILED:', e)
@@ -50,7 +67,7 @@ export async function startConsumer() {
         }
     })
 
-    console.log('👂 Consumidor escutando a fila http://localhost:15672')
+    logger.info({ queue: QUEUE_NAME }, 'Consumidor escutando a fila')
 }
 
 

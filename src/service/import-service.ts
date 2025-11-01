@@ -1,6 +1,7 @@
 import { OfxParser } from './parsers/ofx-parser'
 import { parseCsv } from '@/utils/parse-csv'
 import { publishToQueue } from '@/infra/queue/rabbitmq/rabbitmq'
+import { TransactionMessage } from '@/core/types/transaction-message'
 
 export class ImportService {
     static detectType(buffer: Buffer): 'csv' | 'ofx' | 'unknown' {
@@ -32,8 +33,15 @@ export class ImportService {
             throw new Error('Tipo de arquivo não suportado')
         }
 
+        const normalizedUserId = userId.trim()
+
         for (const transaction of parsed) {
-            publishToQueue({ ...transaction, userId, importJobId: jobId })
+            const message: TransactionMessage = {
+                ...transaction,
+                userId: normalizedUserId,
+                importJobId: jobId,
+            }
+            publishToQueue(message)
         }
         return parsed
     }

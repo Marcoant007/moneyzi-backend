@@ -76,8 +76,10 @@ enum TransactionPaymentMethod {
 
 model User {
   id           String        @id @default(uuid())
+  clerk_id     String?       @unique
   email        String        @unique
   name         String
+  createdAt    DateTime      @default(now())
   transactions Transaction[]
 }
 

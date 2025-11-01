@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/server.ts",
     "build": "tsc",
     "start": "node dist/main.js",
+    "backfill": "ts-node src/backfill-clerk-to-postgres.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -25,6 +26,8 @@
     "ioredis": "^5.6.1",
     "openai": "^5.8.2",
     "papaparse": "^5.5.3",
+    "pino": "^9.12.0",
+    "pino-pretty": "^13.1.1",
     "prisma": "^6.11.1",
     "zod": "^3.25.71"
   },
@@ -33,6 +36,7 @@
     "@types/csv-parse": "^1.2.5",
     "@types/node": "^24.0.10",
     "@types/papaparse": "^5.3.16",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"

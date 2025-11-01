@@ -1,9 +1,9 @@
 import { detectTransactionDataWithIA } from '../openia/detect-transaction-data-with-ia'
 import { AbstractTransactionHandler } from './abstract-transaction-handler'
-import type { Transaction } from '@prisma/client'
+import { TransactionMessage } from '../types/transaction-message'
 
 export class OpenAICategorizationHandler extends AbstractTransactionHandler {
-    async handle(transaction: Partial<Transaction>): Promise<Partial<Transaction>> {
+    async handle(transaction: TransactionMessage): Promise<TransactionMessage> {
         if (!transaction.name) return super.handle(transaction)
 
         const result = await detectTransactionDataWithIA(

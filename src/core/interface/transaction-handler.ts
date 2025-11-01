@@ -1,6 +1,6 @@
-import { Transaction } from "@prisma/client"
+import { TransactionMessage } from '../types/transaction-message'
 
 export interface TransactionHandler {
     setNext(handler: TransactionHandler): TransactionHandler
-    handle(transaction: Partial<Transaction>): Promise<Partial<Transaction>>
+    handle(transaction: TransactionMessage): Promise<TransactionMessage>
 }

@@ -1,8 +1,8 @@
-import type { Transaction } from '@prisma/client'
 import { AbstractTransactionHandler } from './abstract-transaction-handler'
+import { TransactionMessage } from '../types/transaction-message'
 
 export class NormalizeDescriptionHandler extends AbstractTransactionHandler {
-    async handle(transaction: Partial<Transaction>): Promise<Partial<Transaction>> {
+    async handle(transaction: TransactionMessage): Promise<TransactionMessage> {
         if (transaction.name) {
             transaction.name = transaction.name.trim().toLowerCase()
         }

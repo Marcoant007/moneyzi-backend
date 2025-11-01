@@ -1,5 +1,5 @@
-import type { Transaction } from '@prisma/client'
 import { TransactionHandler } from '../interface/transaction-handler'
+import { TransactionMessage } from '../types/transaction-message'
 
 export abstract class AbstractTransactionHandler implements TransactionHandler {
     private nextHandler: TransactionHandler | null = null
@@ -9,7 +9,7 @@ export abstract class AbstractTransactionHandler implements TransactionHandler {
         return handler
     }
 
-    async handle(transaction: Partial<Transaction>): Promise<Partial<Transaction>> {
+    async handle(transaction: TransactionMessage): Promise<TransactionMessage> {
         if (this.nextHandler) {
             return this.nextHandler.handle(transaction)
         }

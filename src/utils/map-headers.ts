@@ -15,7 +15,13 @@ export function mapHeaders(
     for (const original of headers) {
         const key = normalized(original)
 
-        if (key.includes('descricao') || key.includes('nome') || key.includes('titulo')) {
+        if (
+            key.includes('descricao') ||
+            key.includes('nome') ||
+            key.includes('titulo') ||
+            key.includes('lanc') ||
+            key.includes('lancamento')
+        ) {
             result[original] = 'name'
         } else if (key.includes('valor') || key.includes('amount')) {
             result[original] = 'amount'
