@@ -74,7 +74,7 @@ export async function detectTransactionDataWithIA(
 
 	try {
 		const completion = await openai.chat.completions.create({
-			model: 'gpt-4o-mini',
+			model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
 			messages: [
 				{
 					role: 'system',

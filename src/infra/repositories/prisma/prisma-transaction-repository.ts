@@ -7,11 +7,34 @@ export class PrismaTransactionRepository implements TransactionRepository {
         await prisma.transaction.create({ data })
     }
 
-    async groupTotalsByType(userId?: string) {
+    async groupTotalsByType(userId?: string, range?: { start: Date; end: Date }) {
         return prisma.transaction.groupBy({
             by: ['type'],
-            where: userId ? { userId } : undefined,
+            where: {
+                ...(userId ? { userId } : {}),
+                ...(range ? { date: { gte: range.start, lt: range.end } } : {}),
+            },
             _sum: { amount: true },
+        })
+    }
+
+    async groupExpensesByCategory(userId?: string, range?: { start: Date; end: Date }) {
+        return prisma.transaction.groupBy({
+            by: ['category'],
+            where: {
+                type: 'EXPENSE',
+                ...(userId ? { userId } : {}),
+                ...(range ? { date: { gte: range.start, lt: range.end } } : {}),
+            },
+            _sum: { amount: true },
+        })
+    }
+
+    async findLastTransactions(userId?: string, take: number = 10) {
+        return prisma.transaction.findMany({
+            where: userId ? { userId } : undefined,
+            orderBy: { date: 'desc' },
+            take,
         })
     }
 
