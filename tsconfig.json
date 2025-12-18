@@ -6,6 +6,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": "./src",
@@ -15,7 +16,7 @@
       "@routes/*": ["routes/*"],
       "@services/*": ["services/*"],
       "@queue/*": ["queue/*"]
-    },
+    }
   },
   "exclude": ["node_modules", "dist", "src/**/*.js"]
 }
