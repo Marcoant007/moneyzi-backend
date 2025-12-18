@@ -1,34 +1,21 @@
 services:
-  # postgres:
-  #   image: postgres:15
-  #   container_name: finance_postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: finance
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-
   redis:
-    image: redis:7
     container_name: finance_redis
+    image: redis:7
     restart: always
     ports:
-      - "6379:6379"
+      - '6379:6379'
 
   rabbitmq:
-    image: rabbitmq:3-management
     container_name: finance_rabbitmq
+    image: rabbitmq:3-management
     restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - '5672:5672'
+      - '15672:15672'
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: marcoant007
+      RABBITMQ_DEFAULT_PASS: mordekai07
 
 volumes:
-  pgdata:
+  pgdata: null

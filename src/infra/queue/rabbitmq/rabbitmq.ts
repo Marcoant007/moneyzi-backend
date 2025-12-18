@@ -10,8 +10,8 @@ let connection: any
 let channel: amqp.Channel
 const importJobRepository = new PrismaImportJobRepository()
 
-const QUEUE_NAME = getRequiredEnv('IMPORT_QUEUE_NAME')
-const RABBITMQ_URL = getRequiredEnv('RABBITMQ_URL')
+const QUEUE_NAME = process.env.IMPORT_QUEUE_NAME || 'transaction_import'
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://marcoant007:mordekai07@localhost:5672'
 
 export async function connectRabbitMQ() {
     try {
