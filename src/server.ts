@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
+import { connectRabbitMQ, startConsumer } from '../src/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
 import { importRoutes } from '@routes/import.route'
 import Fastify from 'fastify'

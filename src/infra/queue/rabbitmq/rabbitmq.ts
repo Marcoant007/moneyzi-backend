@@ -1,10 +1,9 @@
 import { buildTransactionHandlerChain } from '@/core/handlers/build-transaction-handler'
-import * as amqp from 'amqplib'
-import logger from '@/lib/logger'
-import { getRequiredEnv } from '@/utils/required-env'
 import { TransactionMessage } from '@/core/types/transaction-message'
 import { PrismaImportJobRepository } from '@/infra/repositories/prisma/prisma-import-job-repository'
+import logger from '@/lib/logger'
 import { ImportJobStatus } from '@prisma/client'
+import * as amqp from 'amqplib'
 
 let connection: any
 let channel: amqp.Channel
