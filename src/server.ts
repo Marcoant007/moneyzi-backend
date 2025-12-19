@@ -26,8 +26,8 @@ async function bootstrap() {
         }
     }
 
-    app.listen({ port: 3333 }).then(() => {
-        logger.info('HTTP server running on http://localhost:3333')
+    app.listen({ port: 3333, host: '0.0.0.0' }).then(() => {
+        logger.info('HTTP server running on http://0.0.0.0:3333')
     }).catch((err) => {
         logger.error('Failed to start server', err)
         process.exit(1)
