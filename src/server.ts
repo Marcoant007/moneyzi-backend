@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
+import fastifyCors from '@fastify/cors'
 import { importRoutes } from '@routes/import.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
@@ -8,6 +9,11 @@ import logger from '@/lib/logger'
 
 async function bootstrap() {
     const app = Fastify()
+
+    await app.register(fastifyCors, {
+        origin: process.env.FRONTEND_URL || '*',
+        credentials: true
+    })
 
     await headerAuth(app)
 
