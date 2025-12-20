@@ -26,8 +26,11 @@ async function bootstrap() {
         }
     }
 
-    app.listen({ port: 3333, host: '0.0.0.0' }).then(() => {
-        logger.info('HTTP server running on http://0.0.0.0:3333')
+    const port = Number(process.env.PORT) || 3333
+    const host = process.env.HOST || '0.0.0.0'
+
+    app.listen({ port, host }).then(() => {
+        logger.info(`HTTP server running on http://${host}:${port}`)
     }).catch((err) => {
         logger.error('Failed to start server', err)
         process.exit(1)
