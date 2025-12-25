@@ -3,6 +3,7 @@ import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
 import fastifyCors from '@fastify/cors'
 import { importRoutes } from '@routes/import.route'
+import { categoryRoutes } from '@routes/category.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -18,7 +19,11 @@ async function bootstrap() {
     await headerAuth(app)
 
     app.register(fastifyMultipart)
+    console.log('Registering import routes...')
     app.register(importRoutes)
+    console.log('Registering category routes...')
+    app.register(categoryRoutes)
+    console.log('Routes registered.')
 
     if (process.env.DISABLE_QUEUE === 'true') {
         logger.warn('Queues disabled via DISABLE_QUEUE=true; skipping RabbitMQ connection')

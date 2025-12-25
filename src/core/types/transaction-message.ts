@@ -11,4 +11,5 @@ export interface TransactionMessage {
     paymentMethod?: TransactionPaymentMethod
     importJobId?: string
     isRecurring?: boolean
+    categoryId?: string
 }

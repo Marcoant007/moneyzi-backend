@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "backfill": "ts-node src/backfill-clerk-to-postgres.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "seed:categories": "ts-node src/scripts/seed-categories.ts"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +32,7 @@
     "pino": "^9.12.0",
     "pino-pretty": "^13.1.1",
     "prisma": "^6.19.0",
+    "tsconfig-paths": "^4.2.0",
     "zod": "^3.25.71"
   },
   "devDependencies": {
