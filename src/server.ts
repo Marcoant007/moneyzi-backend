@@ -4,6 +4,7 @@ import fastifyMultipart from '@fastify/multipart'
 import fastifyCors from '@fastify/cors'
 import { importRoutes } from '@routes/import.route'
 import { categoryRoutes } from '@routes/category.route'
+import { reportRoutes } from '@routes/report.routes'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -23,6 +24,8 @@ async function bootstrap() {
     app.register(importRoutes)
     console.log('Registering category routes...')
     app.register(categoryRoutes)
+    console.log('Registering report routes...')
+    app.register(reportRoutes)
     console.log('Routes registered.')
 
     if (process.env.DISABLE_QUEUE === 'true') {

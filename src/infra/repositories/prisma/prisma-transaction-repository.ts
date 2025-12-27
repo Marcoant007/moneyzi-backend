@@ -30,13 +30,26 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
-    async groupExpensesByCategoryId(userId: string) {
+    async groupExpensesByCategoryId(userId: string, range?: { start: Date; end: Date }) {
         return prisma.transaction.groupBy({
             by: ['categoryId'],
             where: {
                 userId,
                 type: 'EXPENSE',
-                categoryId: { not: null }
+                categoryId: { not: null },
+                ...(range ? { date: { gte: range.start, lt: range.end } } : {})
+            },
+            _sum: { amount: true }
+        })
+    }
+
+    async groupExpensesByRecurrence(userId: string, range?: { start: Date; end: Date }) {
+        return prisma.transaction.groupBy({
+            by: ['isRecurring'],
+            where: {
+                userId,
+                type: 'EXPENSE',
+                ...(range ? { date: { gte: range.start, lt: range.end } } : {})
             },
             _sum: { amount: true }
         })
