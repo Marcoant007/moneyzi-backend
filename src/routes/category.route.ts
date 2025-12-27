@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
+import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { CreateCategoryUseCase } from '@/application/use-cases/create-category.use-case'
 import { ListCategoriesUseCase } from '@/application/use-cases/list-categories.use-case'
 import { UpdateCategoryUseCase } from '@/application/use-cases/update-category.use-case'
@@ -17,9 +18,10 @@ export async function categoryRoutes(app: FastifyInstance) {
 
 function buildCategoryController(): CategoryController {
     const categoryRepository = new PrismaCategoryRepository()
+    const transactionRepository = new PrismaTransactionRepository()
 
     const createCategoryUseCase = new CreateCategoryUseCase(categoryRepository)
-    const listCategoriesUseCase = new ListCategoriesUseCase(categoryRepository)
+    const listCategoriesUseCase = new ListCategoriesUseCase(categoryRepository, transactionRepository)
     const updateCategoryUseCase = new UpdateCategoryUseCase(categoryRepository)
     const deleteCategoryUseCase = new DeleteCategoryUseCase(categoryRepository)
 

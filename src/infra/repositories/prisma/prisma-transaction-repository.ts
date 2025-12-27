@@ -30,6 +30,18 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
+    async groupExpensesByCategoryId(userId: string) {
+        return prisma.transaction.groupBy({
+            by: ['categoryId'],
+            where: {
+                userId,
+                type: 'EXPENSE',
+                categoryId: { not: null }
+            },
+            _sum: { amount: true }
+        })
+    }
+
     async findLastTransactions(userId?: string, take: number = 10) {
         return prisma.transaction.findMany({
             where: userId ? { userId } : undefined,

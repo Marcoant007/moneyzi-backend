@@ -30,7 +30,6 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
 
         transaction.userId = transaction.userId.trim()
 
-        // ensure the user exists before trying to create the transaction
         const userExists = await this.userRepository.findById(transaction.userId)
         if (!userExists) {
             logger.warn({ userId: transaction.userId }, 'User for transaction not found')
@@ -54,6 +53,7 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
             type: transaction.type,
             category: transaction.category,
             paymentMethod: transaction.paymentMethod,
+            categoryId: transaction.categoryId ?? null,
             importJobId: transaction.importJobId ?? null,
             isRecurring: transaction.isRecurring ?? false,
         }
