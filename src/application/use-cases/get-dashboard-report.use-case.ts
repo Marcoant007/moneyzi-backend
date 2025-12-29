@@ -20,7 +20,6 @@ export class GetDashboardReportUseCase {
     ) { }
 
     async execute(userId: string, period: string = 'thisMonth'): Promise<DashboardReportOutput> {
-        // 1. Determine Date Range
         const now = new Date()
         let start = startOfMonth(now)
         let end = endOfMonth(now)

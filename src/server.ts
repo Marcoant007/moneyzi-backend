@@ -20,13 +20,9 @@ async function bootstrap() {
     await headerAuth(app)
 
     app.register(fastifyMultipart)
-    console.log('Registering import routes...')
     app.register(importRoutes)
-    console.log('Registering category routes...')
     app.register(categoryRoutes)
-    console.log('Registering report routes...')
     app.register(reportRoutes)
-    console.log('Routes registered.')
 
     if (process.env.DISABLE_QUEUE === 'true') {
         logger.warn('Queues disabled via DISABLE_QUEUE=true; skipping RabbitMQ connection')
