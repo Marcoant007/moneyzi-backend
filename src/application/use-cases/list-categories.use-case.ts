@@ -22,8 +22,10 @@ export class ListCategoriesUseCase {
         }
 
         return categories.map(category => ({
-            ...category,
+            id: category.id,
+            name: category.name,
+            createdAt: category.createdAt,
             totalSpend: spendMap.get(category.id) || 0
-        }))
+        })) as any
     }
 }

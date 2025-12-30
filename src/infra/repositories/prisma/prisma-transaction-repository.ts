@@ -20,7 +20,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
 
     async groupExpensesByCategory(userId?: string, range?: { start: Date; end: Date }) {
         return prisma.transaction.groupBy({
-            by: ['category'],
+            by: ['category', 'categoryId'],
             where: {
                 type: 'EXPENSE',
                 ...(userId ? { userId } : {}),
