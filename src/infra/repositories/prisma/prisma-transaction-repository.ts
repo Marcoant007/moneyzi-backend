@@ -32,11 +32,10 @@ export class PrismaTransactionRepository implements TransactionRepository {
 
     async groupExpensesByCategoryId(userId: string, range?: { start: Date; end: Date }) {
         return prisma.transaction.groupBy({
-            by: ['categoryId'],
+            by: ['categoryId', 'category'],
             where: {
                 userId,
                 type: 'EXPENSE',
-                categoryId: { not: null },
                 ...(range ? { date: { gte: range.start, lt: range.end } } : {})
             },
             _sum: { amount: true }

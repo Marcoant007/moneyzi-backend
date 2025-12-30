@@ -16,7 +16,8 @@ export class ListCategoriesUseCase {
         const spendMap = new Map<string, number>()
         for (const stat of spendStats) {
             if (stat.categoryId && stat._sum.amount) {
-                spendMap.set(stat.categoryId, Number(stat._sum.amount))
+                const current = spendMap.get(stat.categoryId) || 0
+                spendMap.set(stat.categoryId, current + Number(stat._sum.amount))
             }
         }
 

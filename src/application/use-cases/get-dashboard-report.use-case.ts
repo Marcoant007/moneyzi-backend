@@ -66,12 +66,43 @@ export class GetDashboardReportUseCase {
         })
 
         // 4. Process Category Data
+        const TRANSACTION_CATEGORY_LABELS: Record<string, string> = {
+            EDUCATION: "Educação",
+            ENTERTAINMENT: "Entretenimento",
+            SERVICES: "Serviços",
+            FOOD: "Alimentação",
+            FOOD_DELIVERY: "Lanche",
+            GAMING: "Jogos",
+            HEALTH: "Saúde",
+            HOUSING: "Moradia",
+            OTHER: "Outros",
+            SALARY: "Salário",
+            TRANSPORTATION: "Transporte",
+            SIGNATURE: "Assinatura",
+            STREAMING: "Streaming",
+            UTILITY: "Utilidades",
+        };
+
         const categoryMap = new Map(userCategories.map(c => [c.id, c.name]))
-        const categoriesData = categoryStats
-            .map(stat => ({
-                category: stat.categoryId ? categoryMap.get(stat.categoryId) || 'Unknown' : 'Uncategorized',
-                amount: Number(stat._sum.amount || 0)
-            }))
+        const categoriesDataMap = new Map<string, number>()
+
+        categoryStats.forEach(stat => {
+            const amount = Number(stat._sum.amount || 0)
+            if (amount === 0) return
+
+            let categoryName = 'Outros'
+            if (stat.categoryId) {
+                categoryName = categoryMap.get(stat.categoryId) || 'Desconhecido'
+            } else if (stat.category) {
+                categoryName = TRANSACTION_CATEGORY_LABELS[stat.category] || 'Outros'
+            }
+
+            const current = categoriesDataMap.get(categoryName) || 0
+            categoriesDataMap.set(categoryName, current + amount)
+        })
+
+        const categoriesData = Array.from(categoriesDataMap.entries())
+            .map(([category, amount]) => ({ category, amount }))
             .sort((a, b) => b.amount - a.amount)
 
         const forecastData = monthlyAggregates.map(m => ({
