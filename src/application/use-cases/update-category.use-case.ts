@@ -10,7 +10,7 @@ interface UpdateCategoryRequest {
 export class UpdateCategoryUseCase {
     constructor(private categoryRepository: CategoryRepository) { }
 
-    async execute({ id, userId, name }: UpdateCategoryRequest): Promise<Category> {
+    async execute({ id, userId, name }: UpdateCategoryRequest): Promise<{ id: string; name: string; createdAt: Date }> {
         const category = await this.categoryRepository.findById(id)
 
         if (!category) {
@@ -26,6 +26,12 @@ export class UpdateCategoryUseCase {
             throw new Error('Category name already exists')
         }
 
-        return this.categoryRepository.update(id, { name })
+        const updated = await this.categoryRepository.update(id, { name })
+
+        return {
+            id: updated.id,
+            name: updated.name,
+            createdAt: updated.createdAt
+        }
     }
 }

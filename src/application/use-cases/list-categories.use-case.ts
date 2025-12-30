@@ -8,7 +8,7 @@ export class ListCategoriesUseCase {
         private transactionRepository: TransactionRepository
     ) { }
 
-    async execute(userId: string): Promise<(Category & { totalSpend: number })[]> {
+    async execute(userId: string): Promise<Array<{ id: string; name: string; createdAt: Date; totalSpend: number }>> {
         const categories = await this.categoryRepository.listByUserId(userId)
 
         const spendStats = await this.transactionRepository.groupExpensesByCategoryId(userId)
@@ -26,6 +26,6 @@ export class ListCategoriesUseCase {
             name: category.name,
             createdAt: category.createdAt,
             totalSpend: spendMap.get(category.id) || 0
-        })) as any
+        }))
     }
 }

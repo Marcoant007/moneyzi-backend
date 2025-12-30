@@ -9,16 +9,22 @@ interface CreateCategoryRequest {
 export class CreateCategoryUseCase {
     constructor(private categoryRepository: CategoryRepository) { }
 
-    async execute({ name, userId }: CreateCategoryRequest): Promise<Category> {
+    async execute({ name, userId }: CreateCategoryRequest): Promise<{ id: string; name: string; createdAt: Date }> {
         const categoryExists = await this.categoryRepository.existsByName(userId, name)
 
         if (categoryExists) {
             throw new Error('Category already exists')
         }
 
-        return this.categoryRepository.create({
+        const category = await this.categoryRepository.create({
             name,
             userId
         })
+
+        return {
+            id: category.id,
+            name: category.name,
+            createdAt: category.createdAt
+        }
     }
 }
