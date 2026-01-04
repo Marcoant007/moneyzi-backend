@@ -46,13 +46,13 @@ export class ImportController {
 
     async getDashboard(request: FastifyRequest, reply: FastifyReply) {
         try {
-            const { month } = request.query as { month?: string }
+            const { month, year } = request.query as { month?: string; year?: string }
             const rawUserId = request.headers['x-user-id']
             const userId = Array.isArray(rawUserId)
                 ? rawUserId.filter(Boolean)[0]?.trim()
                 : rawUserId?.trim()
 
-            const dashboardData = await this.getDashboardUseCase.execute({ userId, month })
+            const dashboardData = await this.getDashboardUseCase.execute({ userId, month, year })
             return reply.send({ ok: true, ...dashboardData })
         } catch (error) {
             request.log.error(error)

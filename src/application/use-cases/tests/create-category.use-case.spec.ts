@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { CreateCategoryUseCase } from './create-category.use-case'
+import { CreateCategoryUseCase } from '../create-category.use-case'
 import { CategoryRepository } from '@/application/repositories/category-repository'
 
 describe('CreateCategoryUseCase', () => {

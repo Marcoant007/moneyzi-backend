@@ -1,9 +1,9 @@
-import { detectTransactionDataWithIA } from '../openia/detect-transaction-data-with-ia'
+import { detectTransactionDataWithIA } from '../gemini/detect-transaction-data-with-ia'
 import { AbstractTransactionHandler } from './abstract-transaction-handler'
 import { TransactionMessage } from '../types/transaction-message'
 import { CategoryRepository } from '@/application/repositories/category-repository'
 
-export class OpenAICategorizationHandler extends AbstractTransactionHandler {
+export class GeminiCategorizationHandler extends AbstractTransactionHandler {
     constructor(private readonly categoryRepository: CategoryRepository) {
         super()
     }

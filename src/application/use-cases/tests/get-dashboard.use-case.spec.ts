@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { GetDashboardUseCase } from './get-dashboard.use-case'
 import { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { CategoryRepository } from '@/application/repositories/category-repository'
+import { GetDashboardUseCase } from '../get-dashboard.use-case'
 
 describe('GetDashboardUseCase', () => {
     let transactionRepository: TransactionRepository

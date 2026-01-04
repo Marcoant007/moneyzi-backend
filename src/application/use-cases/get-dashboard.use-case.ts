@@ -7,20 +7,21 @@ export class GetDashboardUseCase {
         private readonly categoryRepository: CategoryRepository
     ) { }
 
-    async execute(input?: { userId?: string; month?: string }) {
+    async execute(input?: { userId?: string; month?: string; year?: string }) {
         const now = new Date()
         const currentYear = now.getFullYear()
+        const targetYear = input?.year ? parseInt(input.year) : currentYear
 
         let startOfMonth: Date
         let endOfMonth: Date
 
         if (input?.month) {
             const monthIndex = parseInt(input.month) - 1
-            startOfMonth = new Date(currentYear, monthIndex, 1)
-            endOfMonth = new Date(currentYear, monthIndex + 1, 1)
+            startOfMonth = new Date(targetYear, monthIndex, 1)
+            endOfMonth = new Date(targetYear, monthIndex + 1, 1)
         } else {
-            startOfMonth = new Date(currentYear, now.getMonth(), 1)
-            endOfMonth = new Date(currentYear, now.getMonth() + 1, 1)
+            startOfMonth = new Date(targetYear, now.getMonth(), 1)
+            endOfMonth = new Date(targetYear, now.getMonth() + 1, 1)
         }
 
         const range = { start: startOfMonth, end: endOfMonth }

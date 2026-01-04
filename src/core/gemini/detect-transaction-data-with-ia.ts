@@ -1,4 +1,4 @@
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import {
     TransactionType,
     TransactionCategory,
@@ -6,9 +6,7 @@ import {
 } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-})
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 const VALID_TYPES: TransactionType[] = ['EXPENSE', 'DEPOSIT', 'INVESTMENT']
 
@@ -77,21 +75,21 @@ export async function detectTransactionDataWithIA(
         ${categoryInstruction}`
 
     try {
-        const completion = await openai.chat.completions.create({
-            model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
-            messages: [
-                {
-                    role: 'system',
-                    content: 'Você é um classificador inteligente de transações bancárias.'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ]
+        const model = genAI.getGenerativeModel({
+            model: process.env.GEMINI_MODEL || 'gemini-1.5-flash'
         })
 
-        const raw = completion.choices[0].message.content?.trim() ?? ''
+        const systemInstruction = 'Você é um classificador inteligente de transações bancárias.'
+
+        const fullPrompt = `${systemInstruction}
+
+${prompt}`
+
+        const result = await model.generateContent(fullPrompt)
+        const response = await result.response
+        const text = response.text()
+
+        const raw = text.trim()
         const cleaned = raw.replace(/```json|```/g, '').trim()
         const parsed = JSON.parse(cleaned)
 
