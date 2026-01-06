@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { CreateCategoryUseCase } from '@/application/use-cases/create-category.use-case'
 import { ListCategoriesUseCase } from '@/application/use-cases/list-categories.use-case'
+import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/list-categories-with-transactions.use-case'
 import { UpdateCategoryUseCase } from '@/application/use-cases/update-category.use-case'
 import { DeleteCategoryUseCase } from '@/application/use-cases/delete-category.use-case'
 
@@ -9,6 +10,7 @@ export class CategoryController {
     constructor(
         private createCategoryUseCase: CreateCategoryUseCase,
         private listCategoriesUseCase: ListCategoriesUseCase,
+        private listCategoriesWithTransactionsUseCase: ListCategoriesWithTransactionsUseCase,
         private updateCategoryUseCase: UpdateCategoryUseCase,
         private deleteCategoryUseCase: DeleteCategoryUseCase
     ) { }
@@ -42,6 +44,32 @@ export class CategoryController {
 
         const categories = await this.listCategoriesUseCase.execute(userId)
         return reply.send(categories)
+    }
+
+    async listWithTransactions(request: FastifyRequest, reply: FastifyReply) {
+        const querySchema = z.object({
+            month: z.string().optional(),
+            year: z.string().optional(),
+        })
+
+        const { month, year } = querySchema.parse(request.query)
+        const userId = request.headers['x-user-id'] as string
+
+        if (!userId) {
+            return reply.status(401).send({ error: 'Unauthorized' })
+        }
+
+        try {
+            const result = await this.listCategoriesWithTransactionsUseCase.execute({
+                userId,
+                month,
+                year,
+            })
+            return reply.send(result)
+        } catch (error: any) {
+            request.log.error(error)
+            return reply.status(500).send({ error: 'Internal server error' })
+        }
     }
 
     async update(request: FastifyRequest, reply: FastifyReply) {

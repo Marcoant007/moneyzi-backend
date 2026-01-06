@@ -38,6 +38,15 @@ export class ImportController {
                 if (error.message === 'Usuário inválido') {
                     return reply.status(400).send({ error: 'Usuário inválido' })
                 }
+                if (error.message.startsWith('Erro ao processar arquivo:')) {
+                    return reply.status(400).send({ error: error.message })
+                }
+                if (error.message.startsWith('Erro ao criar job de importação:')) {
+                    return reply.status(500).send({ error: error.message })
+                }
+                if (error.message.startsWith('Erro ao iniciar processamento:')) {
+                    return reply.status(500).send({ error: error.message })
+                }
             }
 
             return reply.status(500).send({ error: 'Erro ao iniciar importação' })

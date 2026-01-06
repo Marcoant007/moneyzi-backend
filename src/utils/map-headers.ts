@@ -17,7 +17,9 @@ export function mapHeaders(
 
         if (
             key.includes('descricao') ||
+            key.includes('description') ||
             key.includes('nome') ||
+            key.includes('name') ||
             key.includes('titulo') ||
             key.includes('lanc') ||
             key.includes('lancamento')
@@ -25,7 +27,7 @@ export function mapHeaders(
             result[original] = 'name'
         } else if (key.includes('valor') || key.includes('amount')) {
             result[original] = 'amount'
-        } else if (key.includes('data')) {
+        } else if (key.includes('data') || key.includes('date')) {
             result[original] = 'date'
         } else if (key.includes('categoria')) {
             result[original] = 'category'

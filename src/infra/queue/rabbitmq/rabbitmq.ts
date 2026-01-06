@@ -21,7 +21,7 @@ export async function connectRabbitMQ() {
         if (typeof channel.prefetch === 'function') {
             channel.prefetch(1)
         }
-        logger.info({ url: RABBITMQ_URL, queue: QUEUE_NAME }, 'Conectado ao RabbitMQ')
+        logger.info({ queue: QUEUE_NAME }, 'Conectado ao RabbitMQ')
     } catch (err) {
         console.error('❌ Erro conectando ao RabbitMQ:', err)
         throw err

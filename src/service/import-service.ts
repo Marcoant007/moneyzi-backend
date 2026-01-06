@@ -33,14 +33,25 @@ export class ImportService {
             throw new Error('Tipo de arquivo não suportado')
         }
 
+        console.log('Parsed transactions:', parsed.length)
+        console.log('First transaction sample:', JSON.stringify(parsed[0], null, 2))
+
         const normalizedUserId = userId.trim()
 
-        for (const transaction of parsed) {
+        for (const [index, transaction] of parsed.entries()) {
             const message: TransactionMessage = {
                 ...transaction,
                 userId: normalizedUserId,
                 importJobId: jobId,
             }
+
+            console.log(`Sending transaction ${index + 1}/${parsed.length} to queue:`, JSON.stringify({
+                userId: message.userId,
+                name: message.name,
+                amount: message.amount,
+                date: message.date,
+            }, null, 2))
+
             publishToQueue(message)
         }
         return parsed
