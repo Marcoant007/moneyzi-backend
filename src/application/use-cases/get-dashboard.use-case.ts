@@ -37,7 +37,7 @@ export class GetDashboardUseCase {
         const investmentsTotal = Number(totalsByType.find(t => t.type === 'INVESTMENT')?._sum.amount || 0)
         const expensesTotal = Number(totalsByType.find(t => t.type === 'EXPENSE')?._sum.amount || 0)
 
-        const balance = depositsTotal - investmentsTotal - expensesTotal
+        const balance = depositsTotal - expensesTotal
         const transactionsTotal = depositsTotal + investmentsTotal + expensesTotal
 
         const typesPercentage = {

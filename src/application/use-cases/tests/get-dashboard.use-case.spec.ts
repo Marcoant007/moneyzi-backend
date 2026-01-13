@@ -41,7 +41,7 @@ describe('GetDashboardUseCase', () => {
         expect(result.depositsTotal).toBe(5000)
         expect(result.expensesTotal).toBe(2000)
         expect(result.investmentsTotal).toBe(1000)
-        expect(result.balance).toBe(2000) // 5000 - 2000 - 1000
+        expect(result.balance).toBe(3000) // 5000 - 2000
     })
 
     it('should calculate percentages correctly', async () => {
