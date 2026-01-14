@@ -1,12 +1,12 @@
 import { FastifyInstance } from 'fastify'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
-import { CreateCategoryUseCase } from '@/application/use-cases/create-category.use-case'
-import { ListCategoriesUseCase } from '@/application/use-cases/list-categories.use-case'
-import { UpdateCategoryUseCase } from '@/application/use-cases/update-category.use-case'
-import { DeleteCategoryUseCase } from '@/application/use-cases/delete-category.use-case'
+import { CreateCategoryUseCase } from '@/application/use-cases/category-use-case/create-category.use-case'
+import { ListCategoriesUseCase } from '@/application/use-cases/category-use-case/list-categories.use-case'
+import { UpdateCategoryUseCase } from '@/application/use-cases/category-use-case/update-category.use-case'
+import { DeleteCategoryUseCase } from '@/application/use-cases/category-use-case/delete-category.use-case'
 import { CategoryController } from '@/application/controllers/category-controller'
-import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/list-categories-with-transactions.use-case'
+import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/category-use-case/list-categories-with-transactions.use-case'
 
 const categoryController = buildCategoryController()
 

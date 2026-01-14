@@ -1,10 +1,10 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { CreateCategoryUseCase } from '@/application/use-cases/create-category.use-case'
-import { ListCategoriesUseCase } from '@/application/use-cases/list-categories.use-case'
-import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/list-categories-with-transactions.use-case'
-import { UpdateCategoryUseCase } from '@/application/use-cases/update-category.use-case'
-import { DeleteCategoryUseCase } from '@/application/use-cases/delete-category.use-case'
+import { CreateCategoryUseCase } from '@/application/use-cases/category-use-case/create-category.use-case'
+import { ListCategoriesUseCase } from '@/application/use-cases/category-use-case/list-categories.use-case'
+import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/category-use-case/list-categories-with-transactions.use-case'
+import { UpdateCategoryUseCase } from '@/application/use-cases/category-use-case/update-category.use-case'
+import { DeleteCategoryUseCase } from '@/application/use-cases/category-use-case/delete-category.use-case'
 
 export class CategoryController {
     constructor(

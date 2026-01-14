@@ -3,9 +3,9 @@ import { ImportController } from '@/application/controllers/import-controller'
 import { PrismaUserRepository } from '@/infra/repositories/prisma/prisma-user-repository'
 import { PrismaImportJobRepository } from '@/infra/repositories/prisma/prisma-import-job-repository'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
-import { StartImportUseCase } from '@/application/use-cases/start-import.use-case'
-import { GetImportJobStatusUseCase } from '@/application/use-cases/get-import-job-status.use-case'
-import { GetDashboardUseCase } from '@/application/use-cases/get-dashboard.use-case'
+import { StartImportUseCase } from '@/application/use-cases/import-use-case/start-import.use-case'
+import { GetImportJobStatusUseCase } from '@/application/use-cases/import-use-case/get-import-job-status.use-case'
+import { GetDashboardUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard.use-case'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 
 export async function importRoutes(app: FastifyInstance) {

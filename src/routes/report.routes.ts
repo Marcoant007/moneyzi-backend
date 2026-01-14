@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { ReportController } from '@/application/controllers/report-controller'
-import { GetDashboardReportUseCase } from '@/application/use-cases/get-dashboard-report.use-case'
+import { GetDashboardReportUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard-report.use-case'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 

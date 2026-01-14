@@ -10,7 +10,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
     async findByCategory(categoryId: string, userId: string, month?: string, year?: string) {
         const startDate = new Date(parseInt(year || '2024'), parseInt(month || '1') - 1, 1)
         const endDate = new Date(parseInt(year || '2024'), parseInt(month || '1'), 0)
-        
+
         const transactions = await prisma.transaction.findMany({
             where: {
                 categoryId,
@@ -104,5 +104,58 @@ export class PrismaTransactionRepository implements TransactionRepository {
             },
             _sum: { amount: true },
         })
+    }
+
+    async findUpcoming(startDate: Date, endDate: Date) {
+        try {
+            console.log(`🔎 [REPOSITORY] Buscando transações vencendo entre ${startDate.toISOString()} e ${endDate.toISOString()}`)
+
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    dueDate: {
+                        lte: endDate,
+                        gte: startDate,
+                    },
+                    deletedAt: null,
+                    type: 'EXPENSE',
+                },
+                include: {
+                    user: true,
+                },
+            })
+
+            console.log(`📊 [REPOSITORY] ${transactions.length} transações encontradas`)
+
+            return transactions.filter((t) => t.dueDate !== null) as any
+        } catch (error) {
+            console.error('❌ [REPOSITORY] Erro ao buscar transações vencendo:', error)
+            throw error
+        }
+    }
+
+    async findOverdue(currentDate: Date) {
+        try {
+            console.log(`🔎 [REPOSITORY] Buscando transações vencidas antes de ${currentDate.toISOString()}`)
+
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    dueDate: {
+                        lt: currentDate,
+                    },
+                    deletedAt: null,
+                    type: 'EXPENSE',
+                },
+                include: {
+                    user: true,
+                },
+            })
+
+            console.log(`📊 [REPOSITORY] ${transactions.length} transações vencidas encontradas`)
+
+            return transactions.filter((t) => t.dueDate !== null) as any
+        } catch (error) {
+            console.error('❌ [REPOSITORY] Erro ao buscar transações vencidas:', error)
+            throw error
+        }
     }
 }

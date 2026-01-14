@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { GetDashboardUseCase } from '../get-dashboard.use-case'
+import { GetDashboardUseCase } from '../dashboard-use-case/get-dashboard.use-case'
 
 describe('GetDashboardUseCase', () => {
     it('calculates totals and categories when month is provided and user has categories', async () => {

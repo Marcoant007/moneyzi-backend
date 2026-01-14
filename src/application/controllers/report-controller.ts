@@ -1,6 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
-import { GetDashboardReportUseCase } from '@/application/use-cases/get-dashboard-report.use-case'
+import { GetDashboardReportUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard-report.use-case'
 
 export class ReportController {
     constructor(

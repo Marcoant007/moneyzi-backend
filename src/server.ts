@@ -5,6 +5,9 @@ import fastifyCors from '@fastify/cors'
 import { importRoutes } from '@routes/import.route'
 import { categoryRoutes } from '@routes/category.route'
 import { reportRoutes } from '@routes/report.routes'
+import { notificationRoutes } from '@routes/notification.route'
+import { cronRoutes } from '@routes/cron.route'
+import { userRoutes } from '@routes/user.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -17,12 +20,18 @@ async function bootstrap() {
         credentials: true
     })
 
-    await headerAuth(app)
+    await app.register(cronRoutes)
+    await app.register(userRoutes)
 
-    app.register(fastifyMultipart)
-    app.register(importRoutes)
-    app.register(categoryRoutes)
-    app.register(reportRoutes)
+    await app.register(async (protectedApp) => {
+        await headerAuth(protectedApp)
+
+        protectedApp.register(fastifyMultipart)
+        protectedApp.register(importRoutes)
+        protectedApp.register(categoryRoutes)
+        protectedApp.register(reportRoutes)
+        protectedApp.register(notificationRoutes)
+    })
 
     if (process.env.DISABLE_QUEUE === 'true') {
         logger.warn('Queues disabled via DISABLE_QUEUE=true; skipping RabbitMQ connection')
