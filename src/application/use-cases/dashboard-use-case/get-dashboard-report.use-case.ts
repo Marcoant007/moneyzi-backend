@@ -1,15 +1,31 @@
 import { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { CategoryRepository } from '@/application/repositories/category-repository'
-import { startOfMonth, subMonths, endOfMonth, format } from 'date-fns'
+import { startOfMonth, addMonths, endOfMonth, format } from 'date-fns'
+import { TransactionType } from '@prisma/client'
 
 export interface DashboardReportOutput {
-    forecast: Array<{ period: string; predicted: number; budget: number }>
+    forecast: Array<{
+        period: string
+        recurringIncome: number
+        recurringExpenses: number
+        balance: number
+    }>
     pie: Array<{ id: string; label: string; value: number }>
     categories: Array<{ category: string; amount: number }>
     insights: {
         forecastTotal: number
         fixedRatio: number
         topCategory: { category: string; amount: number } | null
+    }
+    rule5030: {
+        essentials: number
+        lifestyle: number
+        savings: number
+        percentages: {
+            essentials: number
+            lifestyle: number
+            savings: number
+        }
     }
 }
 
@@ -23,17 +39,17 @@ export class GetDashboardReportUseCase {
         const now = new Date()
         let start = startOfMonth(now)
         let end = endOfMonth(now)
-        let monthsToLookBack = 0
+        let monthsToForecast = 1 // Padrão: apenas este mês
 
         if (period === 'last3Months') {
-            monthsToLookBack = 3
-            start = startOfMonth(subMonths(now, 2))
+            monthsToForecast = 3
+            end = endOfMonth(addMonths(now, 2))
         } else if (period === 'last6Months') {
-            monthsToLookBack = 6
-            start = startOfMonth(subMonths(now, 5))
+            monthsToForecast = 6
+            end = endOfMonth(addMonths(now, 5))
         } else if (period === 'last12Months') {
-            monthsToLookBack = 12
-            start = startOfMonth(subMonths(now, 11))
+            monthsToForecast = 12
+            end = endOfMonth(addMonths(now, 11))
         }
 
         const range = { start, end }
@@ -41,13 +57,11 @@ export class GetDashboardReportUseCase {
         const [
             recurrenceStats,
             categoryStats,
-            userCategories,
-            monthlyAggregates
+            userCategories
         ] = await Promise.all([
             this.transactionRepository.groupExpensesByRecurrence(userId, range),
             this.transactionRepository.groupExpensesByCategoryId(userId, range),
-            this.categoryRepository.listByUserId(userId),
-            this.fetchMonthlyHistory(userId, start, end)
+            this.categoryRepository.listByUserId(userId)
         ])
 
         // 3. Process Pie Data (Fixed vs Variable)
@@ -105,14 +119,14 @@ export class GetDashboardReportUseCase {
             .map(([category, amount]) => ({ category, amount }))
             .sort((a, b) => b.amount - a.amount)
 
-        const forecastData = monthlyAggregates.map(m => ({
-            period: m.label,
-            predicted: m.amount,
-            budget: 6000
-        }))
+        // Buscar previsão de receitas e despesas recorrentes
+        const forecastData = await this.fetchRecurringForecast(userId, start, end)
 
         const totalExpenses = pieData[0].value + pieData[1].value
         const fixedRatio = totalExpenses > 0 ? (pieData[0].value / totalExpenses) * 100 : 0
+
+        // Calcular regra 50/30/20
+        const rule5030Data = this.calculate5030Rule(categoriesData, totalExpenses)
 
         return {
             forecast: forecastData,
@@ -122,36 +136,91 @@ export class GetDashboardReportUseCase {
                 forecastTotal: totalExpenses,
                 fixedRatio,
                 topCategory: categoriesData.length > 0 ? categoriesData[0] : null
+            },
+            rule5030: rule5030Data
+        }
+    }
+
+    private calculate5030Rule(categories: Array<{ category: string; amount: number }>, totalExpenses: number) {
+        // Categorias essenciais (50%)
+        const essentialCategories = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Utilidades']
+
+        // Categorias de estilo de vida (30%)
+        const lifestyleCategories = ['Entretenimento', 'Lanche', 'Food Delivery', 'Streaming', 'Assinatura', 'Jogos']
+
+        let essentials = 0
+        let lifestyle = 0
+
+        categories.forEach(cat => {
+            if (essentialCategories.includes(cat.category)) {
+                essentials += cat.amount
+            } else if (lifestyleCategories.includes(cat.category)) {
+                lifestyle += cat.amount
+            }
+        })
+
+        // Economia = Tudo que não foi gasto (20% ideal)
+        const savings = Math.max(0, totalExpenses - essentials - lifestyle)
+
+        return {
+            essentials,
+            lifestyle,
+            savings,
+            percentages: {
+                essentials: totalExpenses > 0 ? (essentials / totalExpenses) * 100 : 0,
+                lifestyle: totalExpenses > 0 ? (lifestyle / totalExpenses) * 100 : 0,
+                savings: totalExpenses > 0 ? (savings / totalExpenses) * 100 : 0
             }
         }
     }
 
-    private async fetchMonthlyHistory(userId: string, start: Date, end: Date) {
+    private async fetchRecurringForecast(userId: string, start: Date, end: Date) {
         const months: { start: Date, end: Date, label: string }[] = []
         let current = new Date(start)
         while (current <= end) {
             months.push({
                 start: startOfMonth(current),
                 end: endOfMonth(current),
-                label: format(current, 'MMM yy')
+                label: format(current, 'MMM/yy')
             })
             current.setMonth(current.getMonth() + 1)
         }
 
         const results = await Promise.all(
             months.map(async m => {
-                const res = await this.transactionRepository.aggregateMonthlyAmount({
+                // Buscar receitas recorrentes (DEPOSIT)
+                const recurringIncome = await this.transactionRepository.aggregateRecurringAmount({
                     start: m.start,
                     end: m.end,
-                    userId
+                    userId,
+                    type: TransactionType.DEPOSIT
                 })
+
+                // Buscar despesas recorrentes
+                const recurringExpenses = await this.transactionRepository.aggregateRecurringAmount({
+                    start: m.start,
+                    end: m.end,
+                    userId,
+                    type: TransactionType.EXPENSE
+                })
+
+                const income = Number(recurringIncome._sum.amount || 0)
+                const expenses = Number(recurringExpenses._sum.amount || 0)
+
                 return {
                     label: m.label,
-                    amount: Number(res._sum.amount || 0)
+                    recurringIncome: income,
+                    recurringExpenses: expenses,
+                    balance: income - expenses
                 }
             })
         )
 
-        return results
+        return results.map(r => ({
+            period: r.label,
+            recurringIncome: r.recurringIncome,
+            recurringExpenses: r.recurringExpenses,
+            balance: r.balance
+        }))
     }
 }

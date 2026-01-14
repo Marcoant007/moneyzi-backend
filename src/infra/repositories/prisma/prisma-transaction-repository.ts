@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, TransactionType } from '@prisma/client'
 
 export class PrismaTransactionRepository implements TransactionRepository {
     async create(data: Prisma.TransactionUncheckedCreateInput): Promise<void> {
@@ -100,7 +100,21 @@ export class PrismaTransactionRepository implements TransactionRepository {
         return prisma.transaction.aggregate({
             where: {
                 date: { gte: range.start, lt: range.end },
+                type: 'EXPENSE',
                 ...(range.userId ? { userId: range.userId } : {}),
+            },
+            _sum: { amount: true },
+        })
+    }
+
+    async aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType }) {
+        return prisma.transaction.aggregate({
+            where: {
+                date: { gte: range.start, lt: range.end },
+                userId: range.userId,
+                type: range.type,
+                isRecurring: true,
+                deletedAt: null,
             },
             _sum: { amount: true },
         })
