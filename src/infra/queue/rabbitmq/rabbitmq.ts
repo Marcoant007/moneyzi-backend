@@ -10,10 +10,15 @@ let channel: amqp.Channel
 const importJobRepository = new PrismaImportJobRepository()
 
 const QUEUE_NAME = process.env.IMPORT_QUEUE_NAME || 'transaction_import'
-const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://marcoant007:mordekai07@localhost:5672'
+const RABBITMQ_URL = process.env.RABBITMQ_URL || '';
 
 export async function connectRabbitMQ() {
+    if (!RABBITMQ_URL) {
+        throw new Error('RABBITMQ_URL environment variable is required')
+    }
+
     try {
+        logger.info({ url: RABBITMQ_URL.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') }, 'Conectando ao RabbitMQ...')
         const conn = await amqp.connect(RABBITMQ_URL)
         connection = conn
         channel = await conn.createChannel()
@@ -23,7 +28,7 @@ export async function connectRabbitMQ() {
         }
         logger.info({ queue: QUEUE_NAME }, 'Conectado ao RabbitMQ')
     } catch (err) {
-        console.error('❌ Erro conectando ao RabbitMQ:', err)
+        logger.error({ error: err }, '❌ Erro conectando ao RabbitMQ')
         throw err
     }
 }
