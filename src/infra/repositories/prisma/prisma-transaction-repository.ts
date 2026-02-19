@@ -172,4 +172,39 @@ export class PrismaTransactionRepository implements TransactionRepository {
             throw error
         }
     }
+
+    async findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date) {
+        return prisma.transaction.findMany({
+            where: {
+                creditCardId,
+                deletedAt: null,
+                date: {
+                    gte: startDate,
+                    lt: endDate,
+                },
+            },
+            orderBy: {
+                date: 'desc',
+            },
+        })
+    }
+
+    async findByCreditCardId(creditCardId: string, month: number, year: number) {
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59);
+
+        return prisma.transaction.findMany({
+            where: {
+                creditCardId,
+                deletedAt: null,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            orderBy: {
+                date: 'desc',
+            },
+        });
+    }
 }

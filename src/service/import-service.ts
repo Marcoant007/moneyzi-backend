@@ -20,7 +20,7 @@ export class ImportService {
         throw new Error('Tipo de arquivo não suportado')
     }
 
-    static async import(buffer: Buffer, userId: string, jobId?: string) {
+    static async import(buffer: Buffer, userId: string, jobId?: string, creditCardId?: string) {
         const type = this.detectType(buffer)
 
         let parsed: Partial<any>[] = []
@@ -43,6 +43,7 @@ export class ImportService {
                 ...transaction,
                 userId: normalizedUserId,
                 importJobId: jobId,
+                creditCardId: creditCardId,
             }
 
             console.log(`Sending transaction ${index + 1}/${parsed.length} to queue:`, JSON.stringify({
@@ -50,6 +51,7 @@ export class ImportService {
                 name: message.name,
                 amount: message.amount,
                 date: message.date,
+                creditCardId: message.creditCardId,
             }, null, 2))
 
             publishToQueue(message)

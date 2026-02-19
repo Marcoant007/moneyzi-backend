@@ -22,6 +22,7 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
             amount: transaction.amount,
             userId: transaction.userId,
             name: transaction.name ? String(transaction.name).slice(0, 60) : undefined,
+            creditCardId: transaction.creditCardId,
         }, 'Processing transaction')
 
         if (!transaction.userId || !transaction.name || !transaction.amount || !transaction.date) {
@@ -55,10 +56,18 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
             paymentMethod: transaction.paymentMethod,
             categoryId: transaction.categoryId ?? null,
             importJobId: transaction.importJobId ?? null,
+            creditCardId: transaction.creditCardId ?? null,
             isRecurring: transaction.isRecurring ?? false,
         }
 
         await this.transactionRepository.create(payload)
+
+        if (transaction.creditCardId) {
+            logger.info({
+                transactionName: transaction.name,
+                creditCardId: transaction.creditCardId
+            }, 'Transaction linked to credit card')
+        }
 
         const jobId = (transaction as any).importJobId as string | undefined
         if (jobId) {

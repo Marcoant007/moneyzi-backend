@@ -18,15 +18,28 @@ export class ImportController {
 
         request.log.info({ url: request.url, userId: userId ?? null }, 'Import request received')
 
-        const file = await request.file().catch(() => null)
-        if (!file || !userId) {
+        const data = await request.file().catch(() => null)
+        if (!data || !userId) {
             return reply.status(400).send({ error: 'Arquivo ou usuário ausente' })
         }
 
-        const buffer = await file.toBuffer()
+        const buffer = await data.toBuffer()
+        
+        // Ler campos do multipart form
+        const creditCardId = typeof data.fields.creditCardId === 'object' && 'value' in data.fields.creditCardId
+            ? String(data.fields.creditCardId.value)
+            : undefined
+        const isCreditCardInvoice = typeof data.fields.isCreditCardInvoice === 'object' && 'value' in data.fields.isCreditCardInvoice
+            ? String(data.fields.isCreditCardInvoice.value) === 'true'
+            : false
 
         try {
-            const { job } = await this.startImportUseCase.execute({ userId, fileBuffer: buffer })
+            const { job } = await this.startImportUseCase.execute({
+                userId,
+                fileBuffer: buffer,
+                creditCardId,
+                isCreditCardInvoice
+            })
             return reply.status(202).send({ message: 'Arquivo sendo processado', job })
         } catch (error) {
             request.log.error(error)

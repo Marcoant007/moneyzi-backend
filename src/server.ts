@@ -8,6 +8,7 @@ import { reportRoutes } from '@routes/report.routes'
 import { notificationRoutes } from '@routes/notification.route'
 import { cronRoutes } from '@routes/cron.route'
 import { userRoutes } from '@routes/user.route'
+import { creditCardRoutes } from '@routes/credit-card.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -31,6 +32,7 @@ async function bootstrap() {
         protectedApp.register(categoryRoutes)
         protectedApp.register(reportRoutes)
         protectedApp.register(notificationRoutes)
+        protectedApp.register(creditCardRoutes)
     })
 
     if (process.env.DISABLE_QUEUE === 'true') {

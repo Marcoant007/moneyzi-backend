@@ -19,4 +19,6 @@ export interface TransactionRepository {
     aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType }): Promise<{ _sum: { amount: Decimal | null } }>
     findUpcoming(startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date }>>
     findOverdue(currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date }>>
+    findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}>>>
+    findByCreditCardId(creditCardId: string, month: number, year: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
 }

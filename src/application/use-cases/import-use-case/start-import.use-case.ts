@@ -9,7 +9,12 @@ export class StartImportUseCase {
         private readonly importJobRepository: ImportJobRepository,
     ) { }
 
-    async execute(input: { userId: string; fileBuffer: Buffer }): Promise<{ job: ImportJobDto }> {
+    async execute(input: { 
+        userId: string; 
+        fileBuffer: Buffer;
+        creditCardId?: string;
+        isCreditCardInvoice?: boolean;
+    }): Promise<{ job: ImportJobDto }> {
         const userId = input.userId.trim()
         if (!userId) {
             throw new Error('Usuário inválido')
@@ -38,6 +43,8 @@ export class StartImportUseCase {
                 userId,
                 total: parsed.length,
                 processed: 0,
+                creditCardId: input.creditCardId,
+                isCreditCardInvoice: input.isCreditCardInvoice || false,
             })
             console.log('Import job created with ID:', job.id)
         } catch (error) {
@@ -47,7 +54,7 @@ export class StartImportUseCase {
 
         console.log('Starting import process...')
         try {
-            await ImportService.import(input.fileBuffer, userId, job.id)
+            await ImportService.import(input.fileBuffer, userId, job.id, input.creditCardId)
             console.log('Import process started successfully')
         } catch (error) {
             console.error('Error starting import process:', error)

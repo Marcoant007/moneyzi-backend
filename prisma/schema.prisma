@@ -26,6 +26,8 @@ model Transaction {
   user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryId     String?
   categoryRef    Category?                  @relation(fields: [categoryId], references: [id])
+  creditCardId   String?                    
+  creditCard     CreditCard?                @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
   notifications  Notification[]
 
   @@index([userId])
@@ -34,16 +36,21 @@ model Transaction {
   @@index([deletedAt])
   @@index([importJobId])
   @@index([dueDate])
+  @@index([creditCardId])
 }
 
 model ImportJob {
-  id         String          @id @default(uuid())
-  userId     String
-  status     ImportJobStatus @default(PROCESSING)
-  total      Int             @default(0)
-  processed  Int             @default(0)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id                  String          @id @default(uuid())
+  userId              String
+  status              ImportJobStatus @default(PROCESSING)
+  total               Int             @default(0)
+  processed           Int             @default(0)
+  isCreditCardInvoice Boolean         @default(false)
+  creditCardId        String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([creditCardId])
 }
 
 model Notification {
@@ -57,7 +64,7 @@ model Notification {
   transactionId String?
   transaction   Transaction?     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  updatedAt     DateTime         @default(now()) @updatedAt
 
   @@index([userId])
   @@index([userId, isRead])
@@ -116,6 +123,7 @@ model User {
   transactions  Transaction[]
   categories    Category[]
   notifications Notification[]
+  creditCards   CreditCard[]
 }
 
 model Category {
@@ -134,4 +142,33 @@ enum ImportJobStatus {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+model CreditCard {
+  id             String        @id @default(uuid())
+  name           String        
+  lastFourDigits String?       
+  brand          CardBrand?    
+  limit          Decimal?      @db.Decimal(10, 2)
+  closingDay     Int?          
+  dueDay         Int?          
+  color          String        @default("#3b82f6") 
+  isActive       Boolean       @default(true)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   Transaction[] 
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+}
+
+enum CardBrand {
+  VISA
+  MASTERCARD
+  ELO
+  AMEX
+  HIPERCARD
+  OTHER
 }

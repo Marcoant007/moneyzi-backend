@@ -10,6 +10,7 @@ export interface TransactionMessage {
     category?: TransactionCategory
     paymentMethod?: TransactionPaymentMethod
     importJobId?: string
+    creditCardId?: string
     isRecurring?: boolean
     categoryId?: string
 }
