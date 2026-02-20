@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { TransactionRepository } from '@/application/repositories/transaction-repository'
+import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
 import type { Prisma, TransactionType } from '@prisma/client'
 
 export class PrismaTransactionRepository implements TransactionRepository {
@@ -206,5 +206,69 @@ export class PrismaTransactionRepository implements TransactionRepository {
                 date: 'desc',
             },
         });
+    }
+
+    // ── Payables & Receivables ──────────────────────────────────────────────
+
+    async findPayables(userId: string, filters?: PayablesFilter) {
+        const where = this.buildDueDateWhere(userId, 'EXPENSE', filters)
+        return prisma.transaction.findMany({
+            where,
+            include: { creditCard: true },
+            orderBy: { dueDate: 'asc' },
+        })
+    }
+
+    async findReceivables(userId: string, filters?: PayablesFilter) {
+        const where = this.buildDueDateWhere(userId, 'DEPOSIT', filters)
+        return prisma.transaction.findMany({
+            where,
+            orderBy: { dueDate: 'asc' },
+        })
+    }
+
+    async markAsPaid(ids: string[], paidAt?: Date): Promise<void> {
+        await prisma.transaction.updateMany({
+            where: { id: { in: ids } },
+            data: {
+                paymentStatus: 'PAID',
+                paidAt: paidAt ?? new Date(),
+            },
+        })
+    }
+
+    async markAsPending(ids: string[]): Promise<void> {
+        await prisma.transaction.updateMany({
+            where: { id: { in: ids } },
+            data: {
+                paymentStatus: 'PENDING',
+                paidAt: null,
+            },
+        })
+    }
+
+    private buildDueDateWhere(userId: string, type: TransactionType, filters?: PayablesFilter) {
+        const where: Prisma.TransactionWhereInput = {
+            userId,
+            type,
+            dueDate: { not: null },
+            deletedAt: null,
+        }
+
+        if (filters?.status) {
+            where.paymentStatus = filters.status
+        }
+
+        if (filters?.month && filters?.year) {
+            const start = new Date(filters.year, filters.month - 1, 1)
+            const end = new Date(filters.year, filters.month, 1)
+            where.dueDate = { gte: start, lt: end }
+        } else if (filters?.year) {
+            const start = new Date(filters.year, 0, 1)
+            const end = new Date(filters.year + 1, 0, 1)
+            where.dueDate = { gte: start, lt: end }
+        }
+
+        return where
     }
 }

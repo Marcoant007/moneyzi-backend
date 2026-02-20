@@ -19,6 +19,8 @@ model Transaction {
   date           DateTime
   dueDate        DateTime?
   isRecurring    Boolean                    @default(false)
+  paymentStatus  PaymentStatus              @default(PENDING)
+  paidAt         DateTime?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
   deletedAt      DateTime?
@@ -26,7 +28,7 @@ model Transaction {
   user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryId     String?
   categoryRef    Category?                  @relation(fields: [categoryId], references: [id])
-  creditCardId   String?                    
+  creditCardId   String?
   creditCard     CreditCard?                @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
   notifications  Notification[]
 
@@ -37,6 +39,8 @@ model Transaction {
   @@index([importJobId])
   @@index([dueDate])
   @@index([creditCardId])
+  @@index([paymentStatus])
+  @@index([userId, paymentStatus])
 }
 
 model ImportJob {
@@ -79,6 +83,11 @@ enum NotificationType {
   BUDGET_ALERT
   MONTHLY_SUMMARY
   PAYMENT_RECEIVED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
 }
 
 enum TransactionType {

@@ -1,5 +1,11 @@
-import type { Prisma, TransactionCategory, TransactionPaymentMethod, TransactionType } from '@prisma/client'
+import type { Prisma, PaymentStatus, TransactionCategory, TransactionPaymentMethod, TransactionType } from '@prisma/client'
 import type { Decimal } from '@prisma/client/runtime/library'
+
+export interface PayablesFilter {
+    month?: number
+    year?: number
+    status?: PaymentStatus
+}
 
 export interface TransactionRepository {
     create(data: Prisma.TransactionUncheckedCreateInput): Promise<void>
@@ -21,4 +27,9 @@ export interface TransactionRepository {
     findOverdue(currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date }>>
     findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     findByCreditCardId(creditCardId: string, month: number, year: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
+    // Payables & Receivables
+    findPayables(userId: string, filters?: PayablesFilter): Promise<Array<Prisma.TransactionGetPayload<{ include: { creditCard: true } }>>>
+    findReceivables(userId: string, filters?: PayablesFilter): Promise<Array<Prisma.TransactionGetPayload<{}>>>
+    markAsPaid(ids: string[], paidAt?: Date): Promise<void>
+    markAsPending(ids: string[]): Promise<void>
 }
