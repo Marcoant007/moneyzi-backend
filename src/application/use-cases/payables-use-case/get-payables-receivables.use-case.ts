@@ -140,6 +140,7 @@ export class GetPayablesReceivablesUseCase {
             name: string
             description: string | null
             amount: any
+            date: Date
             dueDate: Date | null
             paymentStatus: PaymentStatus
             paidAt: Date | null
@@ -148,7 +149,8 @@ export class GetPayablesReceivablesUseCase {
         },
         today: Date
     ): TransactionItem {
-        const dueDate = transaction.dueDate!
+        // Use dueDate if present, otherwise fall back to the transaction date
+        const dueDate = transaction.dueDate ?? transaction.date
         return {
             id: transaction.id,
             name: transaction.name,

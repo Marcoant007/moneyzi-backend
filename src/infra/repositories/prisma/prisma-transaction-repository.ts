@@ -220,10 +220,45 @@ export class PrismaTransactionRepository implements TransactionRepository {
     }
 
     async findReceivables(userId: string, filters?: PayablesFilter) {
-        const where = this.buildDueDateWhere(userId, 'DEPOSIT', filters)
+        const baseWhere: Prisma.TransactionWhereInput = {
+            userId,
+            type: 'DEPOSIT',
+            deletedAt: null,
+        }
+
+        if (filters?.status) {
+            baseWhere.paymentStatus = filters.status
+        }
+
+        // Build date range from month/year filters
+        let start: Date | undefined
+        let end: Date | undefined
+        if (filters?.month && filters?.year) {
+            start = new Date(filters.year, filters.month - 1, 1)
+            end = new Date(filters.year, filters.month, 1)
+        } else if (filters?.year) {
+            start = new Date(filters.year, 0, 1)
+            end = new Date(filters.year + 1, 0, 1)
+        }
+
+        const dateRange = start && end ? { gte: start, lt: end } : undefined
+
         return prisma.transaction.findMany({
-            where,
-            orderBy: { dueDate: 'asc' },
+            where: {
+                ...baseWhere,
+                OR: dateRange
+                    ? [
+                        // Has dueDate in range
+                        { dueDate: dateRange },
+                        // No dueDate — fall back to transaction date
+                        { dueDate: null, date: dateRange },
+                    ]
+                    : undefined,
+            },
+            orderBy: [
+                { dueDate: 'asc' },
+                { date: 'asc' },
+            ],
         })
     }
 
