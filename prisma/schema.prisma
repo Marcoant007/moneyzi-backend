@@ -30,6 +30,8 @@ model Transaction {
   categoryRef    Category?                  @relation(fields: [categoryId], references: [id])
   creditCardId   String?
   creditCard     CreditCard?                @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+  accountId      String?
+  account        Account?                   @relation(fields: [accountId], references: [id], onDelete: SetNull)
   notifications  Notification[]
 
   @@index([userId])
@@ -39,6 +41,7 @@ model Transaction {
   @@index([importJobId])
   @@index([dueDate])
   @@index([creditCardId])
+  @@index([accountId])
   @@index([paymentStatus])
   @@index([userId, paymentStatus])
 }
@@ -130,6 +133,7 @@ model User {
   name          String
   createdAt     DateTime       @default(now())
   transactions  Transaction[]
+  accounts      Account[]
   categories    Category[]
   notifications Notification[]
   creditCards   CreditCard[]
@@ -171,6 +175,33 @@ model CreditCard {
 
   @@index([userId])
   @@index([userId, isActive])
+}
+
+model Account {
+  id             String      @id @default(uuid())
+  name           String
+  type           AccountType @default(CHECKING)
+  initialBalance Decimal     @default(0) @db.Decimal(10, 2)
+  color          String?
+  icon           String?
+  isActive       Boolean     @default(true)
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([userId, isActive])
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  INVESTMENT
+  CASH
+  PIGGY_BANK
+  OTHER
 }
 
 enum CardBrand {
