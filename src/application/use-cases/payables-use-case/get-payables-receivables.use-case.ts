@@ -87,6 +87,7 @@ export class GetPayablesReceivablesUseCase {
 
         // ── Group card transactions into statements ──
         const cardStatements = this.groupCardStatements(cardTransactions, today)
+            .filter((statement) => this.isInPeriod(statement.dueDate, input.month, input.year))
 
         // ── totals for payables (plain + card) ──
         const cardStatementAmounts = cardStatements.map((statement) => ({
@@ -169,10 +170,11 @@ export class GetPayablesReceivablesUseCase {
         cardTransactions: Array<{
             id: string
             creditCardId: string | null
+            date: Date
             dueDate: Date | null
             amount: any
             paymentStatus: PaymentStatus
-            creditCard?: { name: string } | null
+            creditCard?: { name: string; dueDay?: number | null; closingDay?: number | null } | null
         }>,
         today: Date
     ): CardStatementItem[] {
@@ -187,9 +189,16 @@ export class GetPayablesReceivablesUseCase {
         }>()
 
         for (const transaction of cardTransactions) {
-            if (!transaction.creditCardId || !transaction.dueDate) continue
+            if (!transaction.creditCardId) continue
 
-            const dueDate = transaction.dueDate
+            const dueDate = this.resolveCardDueDate(
+                transaction.dueDate,
+                transaction.date,
+                transaction.creditCard?.dueDay ?? null,
+                transaction.creditCard?.closingDay ?? null,
+            )
+            if (!dueDate) continue
+
             const groupKey = `${transaction.creditCardId}__${dueDate.getFullYear()}-${dueDate.getMonth()}`
 
             if (!groupsByKey.has(groupKey)) {
@@ -234,6 +243,49 @@ export class GetPayablesReceivablesUseCase {
                 itemCount: group.transactionIds.length,
             }
         })
+    }
+
+    private isInPeriod(date: Date, month?: number, year?: number): boolean {
+        if (month && year) {
+            return date.getFullYear() === year && date.getMonth() === month - 1
+        }
+
+        if (year) {
+            return date.getFullYear() === year
+        }
+
+        return true
+    }
+
+    private resolveCardDueDate(
+        dueDate: Date | null,
+        transactionDate: Date,
+        dueDay: number | null,
+        closingDay: number | null,
+    ): Date | null {
+        if (dueDate) return dueDate
+        if (!dueDay) return null
+
+        return this.computeCardDueDate(transactionDate, dueDay, closingDay ?? undefined)
+    }
+
+    private computeCardDueDate(transactionDate: Date, dueDay: number, closingDay?: number): Date {
+        const year = transactionDate.getFullYear()
+        const month = transactionDate.getMonth()
+        const txDay = transactionDate.getDate()
+
+        const monthOffset = closingDay
+            ? (txDay > closingDay ? 1 : 0)
+            : (txDay > dueDay ? 1 : 0)
+
+        const dueYear = year + Math.floor((month + monthOffset) / 12)
+        const dueMonth = (month + monthOffset) % 12
+        const lastDay = new Date(dueYear, dueMonth + 1, 0).getDate()
+        const safeDueDay = Math.max(1, Math.min(dueDay, lastDay))
+
+        const computed = new Date(dueYear, dueMonth, safeDueDay)
+        computed.setHours(0, 0, 0, 0)
+        return computed
     }
 
     private computeTotals(items: Array<{ amount: number; effectiveStatus: EffectiveStatus }>): PayablesTotals {

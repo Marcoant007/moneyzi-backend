@@ -9,13 +9,14 @@ function makeTx(overrides: Partial<{
     name: string
     description: string | null
     amount: number
+    date: Date
     dueDate: Date
     paymentStatus: 'PENDING' | 'PAID'
     paidAt: Date | null
     isRecurring: boolean
     category: string
     creditCardId: string | null
-    creditCard: { name: string } | null
+    creditCard: { name: string; dueDay?: number | null; closingDay?: number | null } | null
     [key: string]: unknown
 }> = {}) {
     return {
@@ -23,6 +24,7 @@ function makeTx(overrides: Partial<{
         name: 'Conta de luz',
         description: null,
         amount: 100,
+        date: new Date('2026-03-01'),
         dueDate: new Date('2026-03-15'),
         paymentStatus: 'PENDING' as const,
         paidAt: null,

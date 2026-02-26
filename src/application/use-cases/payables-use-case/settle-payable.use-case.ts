@@ -50,19 +50,71 @@ export class SettlePayableUseCase {
         const dueDate = new Date(dueDateStr)
         const startOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth(), 1)
         const startOfNextMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 1)
+        const previousMonthStart = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, 1)
+
+        const card = await prisma.creditCard.findUnique({
+            where: { id: creditCardId },
+            select: { dueDay: true, closingDay: true },
+        })
 
         const transactions = await prisma.transaction.findMany({
             where: {
                 creditCardId,
-                dueDate: {
-                    gte: startOfMonth,
-                    lt: startOfNextMonth,
-                },
                 deletedAt: null,
+                OR: [
+                    {
+                        dueDate: {
+                            gte: startOfMonth,
+                            lt: startOfNextMonth,
+                        },
+                    },
+                    {
+                        dueDate: null,
+                        date: {
+                            gte: previousMonthStart,
+                            lt: startOfNextMonth,
+                        },
+                    },
+                ],
             },
-            select: { id: true },
+            select: { id: true, date: true, dueDate: true },
         })
 
-        return transactions.map((t) => t.id)
+        return transactions
+            .filter((transaction) => {
+                if (transaction.dueDate) return true
+                if (!card?.dueDay) return false
+
+                const fallbackDueDate = this.computeCardDueDate(
+                    transaction.date,
+                    card.dueDay,
+                    card.closingDay ?? undefined,
+                )
+
+                return (
+                    fallbackDueDate.getFullYear() === dueDate.getFullYear()
+                    && fallbackDueDate.getMonth() === dueDate.getMonth()
+                )
+            })
+            .map((transaction) => transaction.id)
+    }
+
+    private computeCardDueDate(transactionDate: Date, dueDay: number, closingDay?: number): Date {
+        const year = transactionDate.getFullYear()
+        const month = transactionDate.getMonth()
+        const txDay = transactionDate.getDate()
+
+        const monthOffset = closingDay
+            ? (txDay > closingDay ? 1 : 0)
+            : (txDay > dueDay ? 1 : 0)
+
+        const dueYear = year + Math.floor((month + monthOffset) / 12)
+        const dueMonth = (month + monthOffset) % 12
+        const lastDay = new Date(dueYear, dueMonth + 1, 0).getDate()
+        const safeDueDay = Math.max(1, Math.min(dueDay, lastDay))
+
+        const dueDate = new Date(dueYear, dueMonth, safeDueDay)
+        dueDate.setHours(0, 0, 0, 0)
+        return dueDate
     }
 }

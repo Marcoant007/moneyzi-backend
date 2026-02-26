@@ -211,11 +211,56 @@ export class PrismaTransactionRepository implements TransactionRepository {
     // ── Payables & Receivables ──────────────────────────────────────────────
 
     async findPayables(userId: string, filters?: PayablesFilter) {
-        const where = this.buildDueDateWhere(userId, 'EXPENSE', filters)
+        const where: Prisma.TransactionWhereInput = {
+            userId,
+            type: 'EXPENSE',
+            deletedAt: null,
+        }
+
+        if (filters?.status) {
+            where.paymentStatus = filters.status
+        }
+
+        if (filters?.month && filters?.year) {
+            const start = new Date(filters.year, filters.month - 1, 1)
+            const end = new Date(filters.year, filters.month, 1)
+            const previousMonthStart = new Date(filters.year, filters.month - 2, 1)
+
+            where.OR = [
+                { dueDate: { gte: start, lt: end } },
+                {
+                    creditCardId: { not: null },
+                    dueDate: null,
+                    date: { gte: previousMonthStart, lt: end },
+                },
+            ]
+        } else if (filters?.year) {
+            const start = new Date(filters.year, 0, 1)
+            const end = new Date(filters.year + 1, 0, 1)
+            const previousMonthStart = new Date(filters.year, -1, 1)
+
+            where.OR = [
+                { dueDate: { gte: start, lt: end } },
+                {
+                    creditCardId: { not: null },
+                    dueDate: null,
+                    date: { gte: previousMonthStart, lt: end },
+                },
+            ]
+        } else {
+            where.OR = [
+                { dueDate: { not: null } },
+                { creditCardId: { not: null }, dueDate: null },
+            ]
+        }
+
         return prisma.transaction.findMany({
             where,
             include: { creditCard: true },
-            orderBy: { dueDate: 'asc' },
+            orderBy: [
+                { dueDate: 'asc' },
+                { date: 'asc' },
+            ],
         })
     }
 
@@ -282,28 +327,4 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
-    private buildDueDateWhere(userId: string, type: TransactionType, filters?: PayablesFilter) {
-        const where: Prisma.TransactionWhereInput = {
-            userId,
-            type,
-            dueDate: { not: null },
-            deletedAt: null,
-        }
-
-        if (filters?.status) {
-            where.paymentStatus = filters.status
-        }
-
-        if (filters?.month && filters?.year) {
-            const start = new Date(filters.year, filters.month - 1, 1)
-            const end = new Date(filters.year, filters.month, 1)
-            where.dueDate = { gte: start, lt: end }
-        } else if (filters?.year) {
-            const start = new Date(filters.year, 0, 1)
-            const end = new Date(filters.year + 1, 0, 1)
-            where.dueDate = { gte: start, lt: end }
-        }
-
-        return where
-    }
 }

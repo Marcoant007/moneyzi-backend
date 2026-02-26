@@ -5,6 +5,7 @@ import { TransactionMessage } from '../types/transaction-message'
 import type { UserRepository } from '@/application/repositories/user-repository'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
 import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
+import type { CreditCardRepository } from '@/core/repositories/credit-card-repository'
 import { ImportJobStatus } from '@prisma/client'
 
 export class PersistTransactionHandler extends AbstractTransactionHandler {
@@ -12,6 +13,7 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
         private readonly userRepository: UserRepository,
         private readonly transactionRepository: TransactionRepository,
         private readonly importJobRepository: ImportJobRepository,
+        private readonly creditCardRepository: CreditCardRepository,
     ) {
         super()
     }
@@ -44,12 +46,14 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
         const persistedAt = transaction.date instanceof Date
             ? transaction.date
             : new Date(transaction.date)
+        const computedDueDate = await this.resolveDueDate(transaction, persistedAt)
 
         const payload: Prisma.TransactionUncheckedCreateInput = {
             userId: transaction.userId,
             name: transaction.name,
             amount: transaction.amount,
             date: persistedAt,
+            dueDate: computedDueDate ?? null,
             description: transaction.description ?? null,
             type: transaction.type,
             category: transaction.category,
@@ -83,5 +87,35 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
         }
 
         return transaction
+    }
+
+    private async resolveDueDate(transaction: TransactionMessage, baseDate: Date): Promise<Date | undefined> {
+        if (!transaction.creditCardId) return undefined
+
+        const card = await this.creditCardRepository.findById(transaction.creditCardId)
+        if (!card || card.userId !== transaction.userId) return undefined
+        if (!card.dueDay) return undefined
+
+        return this.computeCardDueDate(baseDate, card.dueDay, card.closingDay ?? undefined)
+    }
+
+    private computeCardDueDate(transactionDate: Date, dueDay: number, closingDay?: number): Date {
+        const year = transactionDate.getFullYear()
+        const month = transactionDate.getMonth()
+        const txDay = transactionDate.getDate()
+
+        // If the purchase happened after closing day, invoice is due in the next month.
+        const monthOffset = closingDay
+            ? (txDay > closingDay ? 1 : 0)
+            : (txDay > dueDay ? 1 : 0)
+
+        const dueYear = year + Math.floor((month + monthOffset) / 12)
+        const dueMonth = (month + monthOffset) % 12
+        const lastDay = new Date(dueYear, dueMonth + 1, 0).getDate()
+        const safeDueDay = Math.max(1, Math.min(dueDay, lastDay))
+
+        const dueDate = new Date(dueYear, dueMonth, safeDueDay)
+        dueDate.setHours(0, 0, 0, 0)
+        return dueDate
     }
 }

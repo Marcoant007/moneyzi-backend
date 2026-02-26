@@ -5,6 +5,7 @@ import { PrismaUserRepository } from '@/infra/repositories/prisma/prisma-user-re
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { PrismaImportJobRepository } from '@/infra/repositories/prisma/prisma-import-job-repository'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
+import { PrismaCreditCardRepository } from '@/infra/repositories/prisma/prisma-credit-card-repository'
 import { GeminiCategorizationHandler } from './gemini-categorization-handler'
 
 export function buildTransactionHandlerChain(): TransactionHandler {
@@ -14,6 +15,7 @@ export function buildTransactionHandlerChain(): TransactionHandler {
         new PrismaUserRepository(),
         new PrismaTransactionRepository(),
         new PrismaImportJobRepository(),
+        new PrismaCreditCardRepository(),
     )
 
     normalize.setNext(categorize).setNext(persist)
