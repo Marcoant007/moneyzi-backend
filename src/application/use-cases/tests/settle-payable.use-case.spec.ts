@@ -76,6 +76,15 @@ describe('SettlePayableUseCase', () => {
     })
 
     it('should settle card statement transactions including fallback due date by closing day', async () => {
+        // Card: closingDay=5, dueDay=10, settling March (2026-03-10)
+        //
+        // Domain rule with closing day:
+        //   txDay <= closingDay  → belongs to CURRENT statement → paid NEXT month    (+1)
+        //   txDay >  closingDay  → belongs to NEXT    statement → paid in TWO months (+2)
+        //
+        // tx-with-due-date   : explicit dueDate = Mar 10  → included (matches March)
+        // tx-fallback-before : Feb 4 (4 ≤ 5) → +1 → Mar 10 → included (Feb statement, paid in March)
+        // tx-fallback-after  : Feb 6 (6 > 5) → +2 → Apr 10 → excluded (Mar statement, paid in April)
         mocks.findCard.mockResolvedValue({ dueDay: 10, closingDay: 5 })
         mocks.findTransactions.mockResolvedValue([
             {
@@ -84,13 +93,13 @@ describe('SettlePayableUseCase', () => {
                 dueDate: new Date(2026, 2, 10),
             },
             {
-                id: 'tx-fallback-in-month',
-                date: new Date(2026, 1, 6),
+                id: 'tx-fallback-before',  // Feb 4 ≤ closingDay 5 → Mar payment
+                date: new Date(2026, 1, 4),
                 dueDate: null,
             },
             {
-                id: 'tx-fallback-out-month',
-                date: new Date(2026, 1, 4),
+                id: 'tx-fallback-after',   // Feb 6 > closingDay 5 → Apr payment (excluded)
+                date: new Date(2026, 1, 6),
                 dueDate: null,
             },
         ])
@@ -106,7 +115,7 @@ describe('SettlePayableUseCase', () => {
 
         expect(transactionRepository.markAsPaid).toHaveBeenCalledWith([
             'tx-with-due-date',
-            'tx-fallback-in-month',
+            'tx-fallback-before',
         ])
         expect(result).toEqual({ updatedCount: 2 })
     })
