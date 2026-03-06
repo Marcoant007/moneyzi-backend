@@ -16,7 +16,11 @@ export function parseCsvRow(
         switch (field) {
             case 'amount':
                 transaction.amount = Number.parseFloat(
-                    value.replace('R$', '').replace(/\./g, '').replace(',', '.')
+                    value
+                        .replace(/\s/g, '')
+                        .replace('R$', '')
+                        .replace(/\./g, '')
+                        .replace(',', '.')
                 )
                 break
 

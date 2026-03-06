@@ -17,9 +17,9 @@ export class GeminiCategorizationHandler extends AbstractTransactionHandler {
             transaction.category
         )
 
-        transaction.type = result.type
+        transaction.type = transaction.isCreditCardInvoice ? 'EXPENSE' : result.type
+        transaction.paymentMethod = transaction.isCreditCardInvoice ? 'CREDIT_CARD' : result.paymentMethod
         transaction.category = result.category
-        transaction.paymentMethod = result.paymentMethod
         transaction.categoryId = result.categoryId
 
         if (!transaction.categoryId && result.categoryName && transaction.userId) {
