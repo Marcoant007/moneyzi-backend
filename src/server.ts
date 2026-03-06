@@ -17,6 +17,7 @@ import logger from '@/lib/logger'
 
 async function bootstrap() {
     const app = Fastify()
+    let queueReady = false
 
     await app.register(fastifyCors, {
         origin: process.env.FRONTEND_URL || '*',
@@ -44,7 +45,7 @@ async function bootstrap() {
     } else {
         try {
             await connectRabbitMQ()
-            await startConsumer()
+            queueReady = true
         } catch (err: any) {
             logger.error('Failed to start server', err)
             logger.warn('RabbitMQ unavailable, continuing without queue')
@@ -54,8 +55,18 @@ async function bootstrap() {
     const port = Number(process.env.PORT) || 3333
     const host = process.env.HOST || '0.0.0.0'
 
-    app.listen({ port, host }).then(() => {
+    app.listen({ port, host }).then(async () => {
         logger.info(`HTTP server running on http://${host}:${port}`)
+
+        if (!queueReady) {
+            return
+        }
+
+        try {
+            await startConsumer()
+        } catch (err: any) {
+            logger.error('Failed to start queue consumer', err)
+        }
     }).catch((err) => {
         logger.error('Failed to start server', err)
         process.exit(1)

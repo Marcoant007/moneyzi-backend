@@ -8,7 +8,7 @@ export interface ImportJobRepository {
         creditCardId?: string;
         isCreditCardInvoice?: boolean;
     }): Promise<ImportJob>
-    incrementProcessed(id: string): Promise<ImportJob>
+    registerAttempt(id: string, didFail: boolean): Promise<ImportJob | null>
     markStatus(id: string, status: ImportJobStatus): Promise<void>
     findById(id: string): Promise<ImportJob | null>
 }
