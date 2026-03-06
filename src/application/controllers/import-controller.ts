@@ -25,13 +25,12 @@ export class ImportController {
 
         const buffer = await data.toBuffer()
         
-        // Ler campos do multipart form
-        const creditCardId = typeof data.fields.creditCardId === 'object' && 'value' in data.fields.creditCardId
-            ? String(data.fields.creditCardId.value)
-            : undefined
-        const isCreditCardInvoice = typeof data.fields.isCreditCardInvoice === 'object' && 'value' in data.fields.isCreditCardInvoice
-            ? String(data.fields.isCreditCardInvoice.value) === 'true'
-            : false
+        // Ler campos do multipart form de maneira resiliente.
+        // Alguns clientes enviam valores como objeto ({ value }) e outros como string.
+        const creditCardId = this.readMultipartFieldValue(data.fields?.creditCardId)
+        const isCreditCardInvoiceRaw = this.readMultipartFieldValue(data.fields?.isCreditCardInvoice)
+        const parsedInvoiceFlag = this.parseBooleanField(isCreditCardInvoiceRaw)
+        const isCreditCardInvoice = parsedInvoiceFlag ?? Boolean(creditCardId)
 
         try {
             const { job } = await this.startImportUseCase.execute({
@@ -96,5 +95,40 @@ export class ImportController {
             request.log.error(error)
             return reply.status(500).send({ error: 'Erro ao buscar job' })
         }
+    }
+
+    private readMultipartFieldValue(field: unknown): string | undefined {
+        if (field == null) return undefined
+        if (Array.isArray(field)) {
+            for (const item of field) {
+                const value = this.readMultipartFieldValue(item)
+                if (value) return value
+            }
+            return undefined
+        }
+
+        if (typeof field === 'string') {
+            const trimmed = field.trim()
+            return trimmed ? trimmed : undefined
+        }
+
+        if (typeof field === 'number' || typeof field === 'boolean') {
+            return String(field)
+        }
+
+        if (typeof field === 'object' && 'value' in field) {
+            return this.readMultipartFieldValue((field as { value: unknown }).value)
+        }
+
+        return undefined
+    }
+
+    private parseBooleanField(value: string | undefined): boolean | undefined {
+        if (value == null) return undefined
+
+        const normalized = value.trim().toLowerCase()
+        if (['true', '1', 'on', 'yes', 'y'].includes(normalized)) return true
+        if (['false', '0', 'off', 'no', 'n'].includes(normalized)) return false
+        return undefined
     }
 }

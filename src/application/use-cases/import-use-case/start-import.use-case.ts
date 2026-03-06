@@ -54,7 +54,13 @@ export class StartImportUseCase {
 
         console.log('Starting import process...')
         try {
-            await ImportService.import(input.fileBuffer, userId, job.id, input.creditCardId)
+            await ImportService.import(
+                input.fileBuffer,
+                userId,
+                job.id,
+                input.creditCardId,
+                input.isCreditCardInvoice,
+            )
             console.log('Import process started successfully')
         } catch (error) {
             console.error('Error starting import process:', error)

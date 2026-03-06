@@ -13,4 +13,6 @@ export interface TransactionMessage {
     creditCardId?: string
     isRecurring?: boolean
     categoryId?: string
+    isCreditCardInvoice?: boolean
+    statementAnchorDate?: string | Date
 }

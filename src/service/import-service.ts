@@ -17,10 +17,16 @@ export class ImportService {
         if (type === 'csv') return parseCsv(buffer)
         if (type === 'ofx') return OfxParser.parse(buffer)
 
-        throw new Error('Tipo de arquivo não suportado')
+        throw new Error('Tipo de arquivo nao suportado')
     }
 
-    static async import(buffer: Buffer, userId: string, jobId?: string, creditCardId?: string) {
+    static async import(
+        buffer: Buffer,
+        userId: string,
+        jobId?: string,
+        creditCardId?: string,
+        isCreditCardInvoice?: boolean,
+    ) {
         const type = this.detectType(buffer)
 
         let parsed: Partial<any>[] = []
@@ -30,20 +36,23 @@ export class ImportService {
         } else if (type === 'ofx') {
             parsed = OfxParser.parse(buffer)
         } else {
-            throw new Error('Tipo de arquivo não suportado')
+            throw new Error('Tipo de arquivo nao suportado')
         }
 
         console.log('Parsed transactions:', parsed.length)
         console.log('First transaction sample:', JSON.stringify(parsed[0], null, 2))
 
         const normalizedUserId = userId.trim()
+        const statementAnchorDate = this.resolveStatementAnchorDate(parsed)
 
         for (const [index, transaction] of parsed.entries()) {
             const message: TransactionMessage = {
                 ...transaction,
                 userId: normalizedUserId,
                 importJobId: jobId,
-                creditCardId: creditCardId,
+                creditCardId,
+                isCreditCardInvoice: Boolean(isCreditCardInvoice),
+                statementAnchorDate: statementAnchorDate ?? undefined,
             }
 
             console.log(`Sending transaction ${index + 1}/${parsed.length} to queue:`, JSON.stringify({
@@ -52,10 +61,27 @@ export class ImportService {
                 amount: message.amount,
                 date: message.date,
                 creditCardId: message.creditCardId,
+                isCreditCardInvoice: message.isCreditCardInvoice,
+                statementAnchorDate: message.statementAnchorDate,
             }, null, 2))
 
             publishToQueue(message)
         }
+
         return parsed
+    }
+
+    private static resolveStatementAnchorDate(parsed: Partial<any>[]): Date | null {
+        const dates = parsed
+            .map((transaction) => transaction.date)
+            .filter((value): value is string | Date => Boolean(value))
+            .map((value) => value instanceof Date ? value : new Date(value))
+            .filter((value) => !Number.isNaN(value.getTime()))
+
+        if (!dates.length) {
+            return null
+        }
+
+        return new Date(Math.max(...dates.map((value) => value.getTime())))
     }
 }
