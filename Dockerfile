@@ -4,9 +4,10 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-# Copy package files and prisma schema first so postinstall can run prisma generate
+# Copy package files, prisma schema and scripts first so postinstall can run prisma generate
 COPY package*.json pnpm-lock.yaml ./
 COPY prisma ./prisma
+COPY scripts ./scripts
 
 # Install pnpm and dependencies
 RUN npm install -g pnpm
