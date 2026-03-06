@@ -7,12 +7,10 @@ import { SettlePayableUseCase } from '@/application/use-cases/payables-use-case/
 export async function payablesRoutes(app: FastifyInstance) {
     const controller = buildPayablesController();
 
-    // GET /payables-receivables?month=2&year=2026&status=PENDING
     app.get('/payables-receivables', (req, reply) =>
         controller.getPayablesReceivables(req, reply)
     );
 
-    // PATCH /payables-receivables/settle
     app.patch('/payables-receivables/settle', (req, reply) =>
         controller.settle(req, reply)
     );

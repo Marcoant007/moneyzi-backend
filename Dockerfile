@@ -27,9 +27,10 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy package files and install only production dependencies
-# Copy package files and prisma schema
+# Copy package files, prisma schema and scripts
 COPY package*.json pnpm-lock.yaml ./
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
 
 # Install only production dependencies (approve builds may be required on CI)
 RUN pnpm install --frozen-lockfile --prod
