@@ -208,6 +208,46 @@ export class PrismaTransactionRepository implements TransactionRepository {
         });
     }
 
+    async findDashboardTransactions(userId: string, range: { start: Date; end: Date }) {
+        return prisma.transaction.findMany({
+            where: {
+                userId,
+                deletedAt: null,
+                OR: [
+                    // Investments are immediate movements based on transaction date.
+                    {
+                        type: 'INVESTMENT',
+                        date: { gte: range.start, lt: range.end },
+                    },
+                    // Settled incomes/expenses use paidAt as source of truth.
+                    {
+                        type: { in: ['DEPOSIT', 'EXPENSE'] },
+                        paymentStatus: 'PAID',
+                        paidAt: { gte: range.start, lt: range.end },
+                    },
+                    // Backward compatibility for old paid records without paidAt.
+                    {
+                        type: { in: ['DEPOSIT', 'EXPENSE'] },
+                        paymentStatus: 'PAID',
+                        paidAt: null,
+                        dueDate: { gte: range.start, lt: range.end },
+                    },
+                    {
+                        type: { in: ['DEPOSIT', 'EXPENSE'] },
+                        paymentStatus: 'PAID',
+                        paidAt: null,
+                        dueDate: null,
+                        date: { gte: range.start, lt: range.end },
+                    },
+                ],
+            },
+            include: {
+                creditCard: true,
+            },
+            orderBy: { date: 'desc' },
+        })
+    }
+
     // ── Payables & Receivables ──────────────────────────────────────────────
 
     async findPayables(userId: string, filters?: PayablesFilter) {
@@ -224,27 +264,27 @@ export class PrismaTransactionRepository implements TransactionRepository {
         if (filters?.month && filters?.year) {
             const start = new Date(filters.year, filters.month - 1, 1)
             const end = new Date(filters.year, filters.month, 1)
-            const previousMonthStart = new Date(filters.year, filters.month - 2, 1)
+            const twoMonthsBackStart = new Date(filters.year, filters.month - 3, 1)
 
             where.OR = [
                 { dueDate: { gte: start, lt: end } },
                 {
                     creditCardId: { not: null },
                     dueDate: null,
-                    date: { gte: previousMonthStart, lt: end },
+                    date: { gte: twoMonthsBackStart, lt: end },
                 },
             ]
         } else if (filters?.year) {
             const start = new Date(filters.year, 0, 1)
             const end = new Date(filters.year + 1, 0, 1)
-            const previousMonthStart = new Date(filters.year, -1, 1)
+            const twoMonthsBackStart = new Date(filters.year, -2, 1)
 
             where.OR = [
                 { dueDate: { gte: start, lt: end } },
                 {
                     creditCardId: { not: null },
                     dueDate: null,
-                    date: { gte: previousMonthStart, lt: end },
+                    date: { gte: twoMonthsBackStart, lt: end },
                 },
             ]
         } else {

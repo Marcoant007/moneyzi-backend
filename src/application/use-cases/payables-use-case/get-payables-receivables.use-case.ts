@@ -1,5 +1,6 @@
 import type { PaymentStatus } from '@prisma/client'
 import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
+import { MoneyUtils } from '@/utils/money.utils'
 
 export type EffectiveStatus = 'PAID' | 'PENDING' | 'OVERDUE'
 
@@ -156,7 +157,7 @@ export class GetPayablesReceivablesUseCase {
             id: transaction.id,
             name: transaction.name,
             description: transaction.description,
-            amount: Number(transaction.amount),
+            amount: MoneyUtils.round(Number(transaction.amount)),
             dueDate,
             paymentStatus: transaction.paymentStatus,
             effectiveStatus: this.computeEffectiveStatus(transaction.paymentStatus, dueDate, today),
@@ -214,7 +215,10 @@ export class GetPayablesReceivablesUseCase {
             }
 
             const group = groupsByKey.get(groupKey)!
-            group.totalAmount += Number(transaction.amount)
+            group.totalAmount = MoneyUtils.add(
+                group.totalAmount,
+                Number(transaction.amount),
+            )
             group.transactionIds.push(transaction.id)
 
             if (transaction.paymentStatus === 'PAID') {
@@ -237,7 +241,7 @@ export class GetPayablesReceivablesUseCase {
                 creditCardId: group.creditCardId,
                 cardName: group.cardName,
                 dueDate: group.dueDate,
-                totalAmount: group.totalAmount,
+                totalAmount: MoneyUtils.round(group.totalAmount),
                 effectiveStatus,
                 transactionIds: group.transactionIds,
                 itemCount: group.transactionIds.length,
@@ -296,18 +300,23 @@ export class GetPayablesReceivablesUseCase {
         let total = 0, pending = 0, paid = 0, overdue = 0
 
         for (const item of items) {
-            total += item.amount
+            total = MoneyUtils.add(total, item.amount)
             if (item.effectiveStatus === 'PAID') {
-                paid += item.amount
+                paid = MoneyUtils.add(paid, item.amount)
             } else if (item.effectiveStatus === 'OVERDUE') {
-                overdue += item.amount
-                pending += item.amount
+                overdue = MoneyUtils.add(overdue, item.amount)
+                pending = MoneyUtils.add(pending, item.amount)
             } else {
-                pending += item.amount
+                pending = MoneyUtils.add(pending, item.amount)
             }
         }
 
-        return { total, pending, paid, overdue }
+        return {
+            total: MoneyUtils.round(total),
+            pending: MoneyUtils.round(pending),
+            paid: MoneyUtils.round(paid),
+            overdue: MoneyUtils.round(overdue),
+        }
     }
 
     private todayStart(): Date {
