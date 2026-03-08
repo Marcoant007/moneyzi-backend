@@ -36,6 +36,7 @@ export class PayablesController {
 
     async settle(request: FastifyRequest, reply: FastifyReply) {
         try {
+            const userId = request.headers['x-user-id'] as string;
             const body = request.body as {
                 mode: 'PAY' | 'UNPAY';
                 scope: 'TRANSACTION' | 'CARD_STATEMENT';
@@ -43,7 +44,10 @@ export class PayablesController {
                 card?: { creditCardId: string; dueDate: string };
             };
 
-            const result = await this.settleUseCase.execute(body);
+            const result = await this.settleUseCase.execute({
+                ...body,
+                userId,
+            });
             return reply.send(result);
         } catch (error) {
             console.error('[PayablesController] Error settling payable:', error);

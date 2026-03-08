@@ -5,6 +5,7 @@ export type SettleMode = 'PAY' | 'UNPAY'
 export type SettleScope = 'TRANSACTION' | 'CARD_STATEMENT'
 
 export interface SettlePayableInput {
+    userId: string
     mode: SettleMode
     scope: SettleScope
     transactionId?: string
@@ -38,7 +39,17 @@ export class SettlePayableUseCase {
             if (!input.transactionId) {
                 throw new Error('transactionId is required for TRANSACTION scope')
             }
-            return [input.transactionId]
+
+            const transaction = await prisma.transaction.findFirst({
+                where: {
+                    id: input.transactionId,
+                    userId: input.userId,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            })
+
+            return transaction ? [transaction.id] : []
         }
 
         // CARD_STATEMENT scope: find all transactions for that card in the same dueDate month/year
@@ -50,7 +61,7 @@ export class SettlePayableUseCase {
         const dueDate = new Date(dueDateStr)
         const startOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth(), 1)
         const startOfNextMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 1)
-        const previousMonthStart = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, 1)
+        const twoMonthsBackStart = new Date(dueDate.getFullYear(), dueDate.getMonth() - 2, 1)
 
         const card = await prisma.creditCard.findUnique({
             where: { id: creditCardId },
@@ -59,6 +70,7 @@ export class SettlePayableUseCase {
 
         const transactions = await prisma.transaction.findMany({
             where: {
+                userId: input.userId,
                 creditCardId,
                 deletedAt: null,
                 OR: [
@@ -71,7 +83,7 @@ export class SettlePayableUseCase {
                     {
                         dueDate: null,
                         date: {
-                            gte: previousMonthStart,
+                            gte: twoMonthsBackStart,
                             lt: startOfNextMonth,
                         },
                     },
@@ -104,10 +116,7 @@ export class SettlePayableUseCase {
         const month = transactionDate.getMonth()
         const txDay = transactionDate.getDate()
 
-        // With a closing day the statement cycle is:
-        //   txDay <= closingDay → belongs to CURRENT statement → paid NEXT month (+1)
-        //   txDay >  closingDay → belongs to NEXT    statement → paid in 2 months  (+2)
-        // Without a closing day we use the dueDay itself as the cycle boundary.
+
         const monthOffset = closingDay
             ? (txDay > closingDay ? 2 : 1)
             : (txDay > dueDay ? 1 : 0)
@@ -117,8 +126,7 @@ export class SettlePayableUseCase {
         const lastDay = new Date(dueYear, dueMonth + 1, 0).getDate()
         const safeDueDay = Math.max(1, Math.min(dueDay, lastDay))
 
-        // Use noon (12:00) to avoid the date shifting back one day when
-        // the value is serialised to UTC and read back in UTC-3 (Brazil).
+
         return new Date(dueYear, dueMonth, safeDueDay, 12, 0, 0, 0)
     }
 }

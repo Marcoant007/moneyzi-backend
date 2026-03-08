@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+﻿import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SettlePayableUseCase } from '../payables-use-case/settle-payable.use-case'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
 
 const mocks = vi.hoisted(() => ({
     findCard: vi.fn(),
     findTransactions: vi.fn(),
+    findFirstTransaction: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -14,6 +15,7 @@ vi.mock('@/lib/prisma', () => ({
         },
         transaction: {
             findMany: mocks.findTransactions,
+            findFirst: mocks.findFirstTransaction,
         },
     },
 }))
@@ -34,19 +36,29 @@ describe('SettlePayableUseCase', () => {
     })
 
     it('should settle a single transaction as paid', async () => {
+        mocks.findFirstTransaction.mockResolvedValue({ id: 'tx-1' })
+
         const result = await sut.execute({
+            userId: 'user-1',
             mode: 'PAY',
             scope: 'TRANSACTION',
             transactionId: 'tx-1',
         })
 
+        expect(mocks.findFirstTransaction).toHaveBeenCalledWith({
+            where: { id: 'tx-1', userId: 'user-1', deletedAt: null },
+            select: { id: true },
+        })
         expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1'])
         expect(transactionRepository.markAsPending).not.toHaveBeenCalled()
         expect(result).toEqual({ updatedCount: 1 })
     })
 
     it('should settle a single transaction as pending when mode is UNPAY', async () => {
+        mocks.findFirstTransaction.mockResolvedValue({ id: 'tx-1' })
+
         const result = await sut.execute({
+            userId: 'user-1',
             mode: 'UNPAY',
             scope: 'TRANSACTION',
             transactionId: 'tx-1',
@@ -60,6 +72,7 @@ describe('SettlePayableUseCase', () => {
     it('should fail when TRANSACTION scope has no transactionId', async () => {
         await expect(
             sut.execute({
+                userId: 'user-1',
                 mode: 'PAY',
                 scope: 'TRANSACTION',
             }),
@@ -69,22 +82,14 @@ describe('SettlePayableUseCase', () => {
     it('should fail when CARD_STATEMENT scope has no card payload', async () => {
         await expect(
             sut.execute({
+                userId: 'user-1',
                 mode: 'PAY',
                 scope: 'CARD_STATEMENT',
             }),
         ).rejects.toThrow('card is required for CARD_STATEMENT scope')
     })
 
-    it('should settle card statement transactions including fallback due date by closing day', async () => {
-        // Card: closingDay=5, dueDay=10, settling March (2026-03-10)
-        //
-        // Domain rule with closing day:
-        //   txDay <= closingDay  → belongs to CURRENT statement → paid NEXT month    (+1)
-        //   txDay >  closingDay  → belongs to NEXT    statement → paid in TWO months (+2)
-        //
-        // tx-with-due-date   : explicit dueDate = Mar 10  → included (matches March)
-        // tx-fallback-before : Feb 4 (4 ≤ 5) → +1 → Mar 10 → included (Feb statement, paid in March)
-        // tx-fallback-after  : Feb 6 (6 > 5) → +2 → Apr 10 → excluded (Mar statement, paid in April)
+    it('should settle card statement transactions including entries from two months back', async () => {
         mocks.findCard.mockResolvedValue({ dueDay: 10, closingDay: 5 })
         mocks.findTransactions.mockResolvedValue([
             {
@@ -93,18 +98,24 @@ describe('SettlePayableUseCase', () => {
                 dueDate: new Date(2026, 2, 10),
             },
             {
-                id: 'tx-fallback-before',  // Feb 4 ≤ closingDay 5 → Mar payment
-                date: new Date(2026, 1, 4),
+                id: 'tx-fallback-before',
+                date: new Date(2026, 1, 4), // Feb 4 <= closingDay 5 -> Mar
                 dueDate: null,
             },
             {
-                id: 'tx-fallback-after',   // Feb 6 > closingDay 5 → Apr payment (excluded)
-                date: new Date(2026, 1, 6),
+                id: 'tx-fallback-after',
+                date: new Date(2026, 1, 6), // Feb 6 > closingDay 5 -> Apr
+                dueDate: null,
+            },
+            {
+                id: 'tx-fallback-jan-after',
+                date: new Date(2026, 0, 20), // Jan 20 > closingDay 5 -> Mar (+2)
                 dueDate: null,
             },
         ])
 
         const result = await sut.execute({
+            userId: 'user-1',
             mode: 'PAY',
             scope: 'CARD_STATEMENT',
             card: {
@@ -113,11 +124,20 @@ describe('SettlePayableUseCase', () => {
             },
         })
 
+        expect(mocks.findTransactions).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    userId: 'user-1',
+                    creditCardId: 'card-1',
+                }),
+            }),
+        )
         expect(transactionRepository.markAsPaid).toHaveBeenCalledWith([
             'tx-with-due-date',
             'tx-fallback-before',
+            'tx-fallback-jan-after',
         ])
-        expect(result).toEqual({ updatedCount: 2 })
+        expect(result).toEqual({ updatedCount: 3 })
     })
 
     it('should fail when no transaction can be resolved for settlement', async () => {
@@ -132,6 +152,7 @@ describe('SettlePayableUseCase', () => {
 
         await expect(
             sut.execute({
+                userId: 'user-1',
                 mode: 'PAY',
                 scope: 'CARD_STATEMENT',
                 card: {
