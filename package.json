@@ -1,5 +1,10 @@
 {
   "name": "moneyzi-backend",
+  "author": {
+    "name": "Marco Antônio de Araujo",
+    "email": "marcoantnovo@gmail.com",
+    "url": "https://marcoantdeveloper.netlify.app"
+  },
   "version": "1.0.0",
   "description": "",
   "main": "dist/server.js",
@@ -18,7 +23,6 @@
     "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
-  "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.6.3",
   "dependencies": {
