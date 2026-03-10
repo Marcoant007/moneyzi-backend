@@ -21,16 +21,20 @@ export class PrismaTransactionRepository implements TransactionRepository {
 
     async findByCategory(categoryId: string, userId: string, month?: string, year?: string) {
         const startDate = new Date(parseInt(year || '2024'), parseInt(month || '1') - 1, 1)
-        const endDate = new Date(parseInt(year || '2024'), parseInt(month || '1'), 0)
+        const endDate = new Date(parseInt(year || '2024'), parseInt(month || '1'), 1)
 
         const transactions = await prisma.transaction.findMany({
             where: {
                 categoryId,
                 userId,
-                date: {
-                    gte: startDate,
-                    lt: new Date(endDate.getTime() + 24 * 60 * 60 * 1000) // Add 1 day to include the last day
-                }
+                deletedAt: null,
+                // Mirror the same date-resolution logic as findDashboardTransactions
+                OR: [
+                    { paymentStatus: 'PAID', paidAt: { gte: startDate, lt: endDate } },
+                    { paymentStatus: 'PAID', paidAt: null, dueDate: { gte: startDate, lt: endDate } },
+                    { paymentStatus: 'PAID', paidAt: null, dueDate: null, date: { gte: startDate, lt: endDate } },
+                    { paymentStatus: { not: 'PAID' }, date: { gte: startDate, lt: endDate } },
+                ],
             },
             select: {
                 id: true,
