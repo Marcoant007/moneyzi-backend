@@ -1,6 +1,18 @@
 import { prisma } from '@/lib/prisma'
 import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
-import type { Prisma, TransactionType } from '@prisma/client'
+import type { Prisma, TransactionCategory, TransactionType } from '@prisma/client'
+
+// Categorias que são consideradas fixas mesmo sem o flag isRecurring=true
+// Deve estar em sincronia com FIXED_ENUM_CATEGORIES em get-monthly-summary.use-case.ts
+const FIXED_ENUM_CATEGORIES: TransactionCategory[] = [
+    'HOUSING',
+    'UTILITY',
+    'SIGNATURE',
+    'STREAMING',
+    'EDUCATION',
+    'HEALTH',
+    'SERVICES',
+]
 
 export class PrismaTransactionRepository implements TransactionRepository {
     async create(data: Prisma.TransactionUncheckedCreateInput): Promise<void> {
@@ -107,14 +119,46 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
-    async aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType }) {
+    async aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType; isRecurring?: boolean }) {
         return prisma.transaction.aggregate({
             where: {
                 date: { gte: range.start, lt: range.end },
                 userId: range.userId,
                 type: range.type,
-                isRecurring: true,
+                isRecurring: range.isRecurring ?? true,
                 deletedAt: null,
+            },
+            _sum: { amount: true },
+        })
+    }
+
+    async aggregateExpensesByType(range: { start: Date; end: Date; userId: string; isFixed: boolean }) {
+        const dateOR = [
+            { paymentStatus: 'PAID' as const, paidAt: { gte: range.start, lt: range.end } },
+            { paymentStatus: 'PAID' as const, paidAt: null, dueDate: { gte: range.start, lt: range.end } },
+            { paymentStatus: 'PAID' as const, paidAt: null, dueDate: null, date: { gte: range.start, lt: range.end } },
+            { paymentStatus: { not: 'PAID' as const }, date: { gte: range.start, lt: range.end } },
+        ]
+
+        const classificationOR = range.isFixed
+            ? [
+                { isRecurring: true },
+                { isRecurring: false, categoryId: null, category: { in: FIXED_ENUM_CATEGORIES } },
+            ]
+            : [
+                { isRecurring: false, categoryId: { not: null } },
+                { isRecurring: false, category: { notIn: FIXED_ENUM_CATEGORIES } },
+            ]
+
+        return prisma.transaction.aggregate({
+            where: {
+                userId: range.userId,
+                type: 'EXPENSE' as const,
+                deletedAt: null,
+                AND: [
+                    { OR: dateOR },
+                    { OR: classificationOR },
+                ],
             },
             _sum: { amount: true },
         })
@@ -214,18 +258,15 @@ export class PrismaTransactionRepository implements TransactionRepository {
                 userId,
                 deletedAt: null,
                 OR: [
-                    // Investments are immediate movements based on transaction date.
                     {
                         type: 'INVESTMENT',
                         date: { gte: range.start, lt: range.end },
                     },
-                    // Settled incomes/expenses use paidAt as source of truth.
                     {
                         type: { in: ['DEPOSIT', 'EXPENSE'] },
                         paymentStatus: 'PAID',
                         paidAt: { gte: range.start, lt: range.end },
                     },
-                    // Backward compatibility for old paid records without paidAt.
                     {
                         type: { in: ['DEPOSIT', 'EXPENSE'] },
                         paymentStatus: 'PAID',
@@ -247,8 +288,6 @@ export class PrismaTransactionRepository implements TransactionRepository {
             orderBy: { date: 'desc' },
         })
     }
-
-    // ── Payables & Receivables ──────────────────────────────────────────────
 
     async findPayables(userId: string, filters?: PayablesFilter) {
         const where: Prisma.TransactionWhereInput = {
@@ -315,7 +354,6 @@ export class PrismaTransactionRepository implements TransactionRepository {
             baseWhere.paymentStatus = filters.status
         }
 
-        // Build date range from month/year filters
         let start: Date | undefined
         let end: Date | undefined
         if (filters?.month && filters?.year) {
@@ -333,9 +371,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
                 ...baseWhere,
                 OR: dateRange
                     ? [
-                        // Has dueDate in range
                         { dueDate: dateRange },
-                        // No dueDate — fall back to transaction date
                         { dueDate: null, date: dateRange },
                     ]
                     : undefined,

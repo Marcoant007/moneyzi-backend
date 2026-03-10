@@ -8,6 +8,7 @@ export interface DashboardReportOutput {
         period: string
         recurringIncome: number
         recurringExpenses: number
+        variableExpenses: number
         balance: number
     }>
     pie: Array<{ id: string; label: string; value: number }>
@@ -55,29 +56,24 @@ export class GetDashboardReportUseCase {
         const range = { start, end }
 
         const [
-            recurrenceStats,
+            pieFixed,
+            pieVariable,
             categoryStats,
             userCategories
         ] = await Promise.all([
-            this.transactionRepository.groupExpensesByRecurrence(userId, range),
+            this.transactionRepository.aggregateExpensesByType({ ...range, userId, isFixed: true }),
+            this.transactionRepository.aggregateExpensesByType({ ...range, userId, isFixed: false }),
             this.transactionRepository.groupExpensesByCategoryId(userId, range),
             this.categoryRepository.listByUserId(userId)
         ])
 
         // 3. Process Pie Data (Fixed vs Variable)
+        // Usa a mesma heurística do GetMonthlySummaryUseCase:
+        // fixo = isRecurring:true OU categoria inerentemente fixa; variável = todo o resto
         const pieData = [
-            { id: 'Fixed', label: 'Fixed', value: 0 },
-            { id: 'Variable', label: 'Variable', value: 0 }
+            { id: 'Fixed', label: 'Fixed', value: Number(pieFixed._sum.amount || 0) },
+            { id: 'Variable', label: 'Variable', value: Number(pieVariable._sum.amount || 0) },
         ]
-
-        recurrenceStats.forEach(stat => {
-            const val = Number(stat._sum.amount || 0)
-            if (stat.isRecurring) {
-                pieData[0].value += val
-            } else {
-                pieData[1].value += val
-            }
-        })
 
         // 4. Process Category Data
         const TRANSACTION_CATEGORY_LABELS: Record<string, string> = {
@@ -196,22 +192,23 @@ export class GetDashboardReportUseCase {
                     type: TransactionType.DEPOSIT
                 })
 
-                // Buscar despesas recorrentes
-                const recurringExpenses = await this.transactionRepository.aggregateRecurringAmount({
-                    start: m.start,
-                    end: m.end,
-                    userId,
-                    type: TransactionType.EXPENSE
-                })
+                // Despesas fixas: isRecurring=true OU categoria inerentemente fixa (ex: Moradia, Streaming)
+                // Despesas variáveis: tudo que não é fixo (ex: compra avulsa, cartão de crédito, picolé)
+                const [recurringExpenses, variableExpenses] = await Promise.all([
+                    this.transactionRepository.aggregateExpensesByType({ start: m.start, end: m.end, userId, isFixed: true }),
+                    this.transactionRepository.aggregateExpensesByType({ start: m.start, end: m.end, userId, isFixed: false }),
+                ])
 
                 const income = Number(recurringIncome._sum.amount || 0)
                 const expenses = Number(recurringExpenses._sum.amount || 0)
+                const variable = Number(variableExpenses._sum.amount || 0)
 
                 return {
                     label: m.label,
                     recurringIncome: income,
                     recurringExpenses: expenses,
-                    balance: income - expenses
+                    variableExpenses: variable,
+                    balance: income - expenses - variable
                 }
             })
         )
@@ -220,6 +217,7 @@ export class GetDashboardReportUseCase {
             period: r.label,
             recurringIncome: r.recurringIncome,
             recurringExpenses: r.recurringExpenses,
+            variableExpenses: r.variableExpenses,
             balance: r.balance
         }))
     }

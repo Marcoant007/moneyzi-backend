@@ -22,7 +22,13 @@ export interface TransactionRepository {
     groupExpensesByRecurrence(userId: string, range?: { start: Date; end: Date }): Promise<Array<{ isRecurring: boolean; _sum: { amount: Decimal | null } }>>
     findLastTransactions(userId?: string, take?: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     aggregateMonthlyAmount(range: { start: Date; end: Date; userId?: string }): Promise<{ _sum: { amount: Decimal | null } }>
-    aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType }): Promise<{ _sum: { amount: Decimal | null } }>
+    aggregateRecurringAmount(range: { start: Date; end: Date; userId: string; type: TransactionType; isRecurring?: boolean }): Promise<{ _sum: { amount: Decimal | null } }>
+    /**
+     * Agrega despesas usando a mesma heurística de fixo/variável do GetMonthlySummaryUseCase:
+     * - Fixo: isRecurring=true OU (isRecurring=false, sem categoria customizada, categoria em FIXED_ENUM_CATEGORIES)
+     * - Variável: tudo que não é fixo
+     */
+    aggregateExpensesByType(range: { start: Date; end: Date; userId: string; isFixed: boolean }): Promise<{ _sum: { amount: Decimal | null } }>
     findUpcoming(startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date }>>
     findOverdue(currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date }>>
     findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}>>>

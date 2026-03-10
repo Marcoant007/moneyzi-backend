@@ -1,10 +1,13 @@
 import { FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { GetDashboardReportUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard-report.use-case'
+import { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-case/get-monthly-summary.use-case'
+import { format } from 'date-fns'
 
 export class ReportController {
     constructor(
-        private getDashboardReportUseCase: GetDashboardReportUseCase
+        private getDashboardReportUseCase: GetDashboardReportUseCase,
+        private getMonthlySummaryUseCase: GetMonthlySummaryUseCase,
     ) { }
 
     async getDashboard(request: FastifyRequest, reply: FastifyReply) {
@@ -25,6 +28,28 @@ export class ReportController {
         } catch (error: any) {
             console.error(error)
             return reply.status(400).send({ error: error.message || 'Failed to generate report' })
+        }
+    }
+
+    async getMonthlySummary(request: FastifyRequest, reply: FastifyReply) {
+        const userId = request.headers['x-user-id'] as string
+
+        if (!userId) {
+            return reply.status(401).send({ error: 'Unauthorized' })
+        }
+
+        const querySchema = z.object({
+            month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+        })
+
+        try {
+            const { month } = querySchema.parse(request.query)
+            const selectedMonth = month ?? format(new Date(), 'yyyy-MM')
+            const report = await this.getMonthlySummaryUseCase.execute(userId, selectedMonth)
+            return reply.send(report)
+        } catch (error: any) {
+            console.error(error)
+            return reply.status(400).send({ error: error.message || 'Failed to generate monthly summary' })
         }
     }
 }
