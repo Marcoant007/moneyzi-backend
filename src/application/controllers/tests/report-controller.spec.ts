@@ -20,9 +20,14 @@ describe('ReportController', () => {
         execute: vi.fn(),
     } as any
 
+    const getAiInsightsUseCase = {
+        execute: vi.fn(),
+    } as any
+
     const controller = new ReportController(
         getDashboardReportUseCase,
         getMonthlySummaryUseCase,
+        getAiInsightsUseCase,
     )
 
     beforeEach(() => {
