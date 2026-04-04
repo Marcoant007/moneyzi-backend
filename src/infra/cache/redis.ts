@@ -1,10 +1,8 @@
 import Redis from 'ioredis'
 import logger from '@/lib/logger'
+import { getRequiredEnv } from '@/utils/required-env'
 
-export const redis = new Redis({
-    host: 'localhost',
-    port: 6379
-})
+export const redis = new Redis(getRequiredEnv('REDIS_URL'))
 
 redis.on('connect', () => logger.info('Redis conectado'))
 redis.on('error', (err: unknown) => {
