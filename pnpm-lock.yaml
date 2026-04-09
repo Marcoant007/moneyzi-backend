@@ -47,6 +47,9 @@ importers:
       pino:
         specifier: ^9.12.0
         version: 9.12.0
+      pino-loki:
+        specifier: ^3.0.0
+        version: 3.0.0
       pino-pretty:
         specifier: ^13.1.1
         version: 13.1.1
@@ -1194,6 +1197,14 @@ packages:
 
   pino-abstract-transport@2.0.0:
     resolution: {integrity: sha512-F63x5tizV6WCh4R6RHyi2Ml+M70DNRXt/+HANowMflpgGFMAym/VKm6G7ZOQRjqN7XbGxK1Lg9t6ZrtzOaivMw==}
+
+  pino-abstract-transport@3.0.0:
+    resolution: {integrity: sha512-wlfUczU+n7Hy/Ha5j9a/gZNy7We5+cXp8YL+X+PG8S0KXxw7n/JXA3c46Y0zQznIJ83URJiwy7Lh56WLokNuxg==}
+
+  pino-loki@3.0.0:
+    resolution: {integrity: sha512-9TyUW5syTjp2nT70QcijJtIWUzdYUj+olQ7+fWNfm1/HrDGEWt86Q4ACzClH6DM6GBwtQimRDgneNczP+p4ypA==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   pino-pretty@13.1.1:
     resolution: {integrity: sha512-TNNEOg0eA0u+/WuqH0MH0Xui7uqVk9D74ESOpjtebSQYbNWJk/dIxCXIxFsNfeN53JmtWqYHP2OrIZjT/CBEnA==}
@@ -2567,6 +2578,15 @@ snapshots:
   pino-abstract-transport@2.0.0:
     dependencies:
       split2: 4.2.0
+
+  pino-abstract-transport@3.0.0:
+    dependencies:
+      split2: 4.2.0
+
+  pino-loki@3.0.0:
+    dependencies:
+      pino-abstract-transport: 3.0.0
+      pump: 3.0.3
 
   pino-pretty@13.1.1:
     dependencies:
