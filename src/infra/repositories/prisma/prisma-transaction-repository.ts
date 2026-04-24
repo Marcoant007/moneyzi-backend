@@ -288,6 +288,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
             },
             include: {
                 creditCard: true,
+                account: { select: { type: true } },
             },
             orderBy: { date: 'desc' },
         })

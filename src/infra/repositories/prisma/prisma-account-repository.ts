@@ -25,26 +25,25 @@ export class PrismaAccountRepository implements AccountRepository {
     }
 
     async listByUserIdWithBalance(userId: string): Promise<AccountWithBalance[]> {
-        const [accounts, groupedTransactions] = await Promise.all([
+        const [accounts, groupedTransactions, transfersFrom, transfersTo] = await Promise.all([
             prisma.account.findMany({
-                where: {
-                    userId,
-                    isActive: true,
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
+                where: { userId, isActive: true },
+                orderBy: { createdAt: 'desc' },
             }),
             prisma.transaction.groupBy({
                 by: ['accountId', 'type'],
-                where: {
-                    userId,
-                    accountId: { not: null },
-                    deletedAt: null,
-                },
-                _sum: {
-                    amount: true,
-                },
+                where: { userId, accountId: { not: null }, deletedAt: null },
+                _sum: { amount: true },
+            }),
+            prisma.transfer.groupBy({
+                by: ['fromAccountId'],
+                where: { userId },
+                _sum: { amount: true },
+            }),
+            prisma.transfer.groupBy({
+                by: ['toAccountId'],
+                where: { userId },
+                _sum: { amount: true },
             }),
         ])
 
@@ -52,27 +51,28 @@ export class PrismaAccountRepository implements AccountRepository {
 
         groupedTransactions.forEach((item) => {
             if (!item.accountId) return
-
             const value = Number(item._sum.amount || 0)
-            const signal =
-                item.type === 'EXPENSE'
-                    ? -1
-                    : item.type === 'DEPOSIT' || item.type === 'INVESTMENT'
-                        ? 1
-                        : 0
-
+            const signal = item.type === 'EXPENSE' ? -1 : item.type === 'DEPOSIT' || item.type === 'INVESTMENT' ? 1 : 0
             const current = movementByAccount.get(item.accountId) || 0
             movementByAccount.set(item.accountId, current + value * signal)
+        })
+
+        transfersFrom.forEach((item) => {
+            const value = Number(item._sum.amount || 0)
+            const current = movementByAccount.get(item.fromAccountId) || 0
+            movementByAccount.set(item.fromAccountId, current - value)
+        })
+
+        transfersTo.forEach((item) => {
+            const value = Number(item._sum.amount || 0)
+            const current = movementByAccount.get(item.toAccountId) || 0
+            movementByAccount.set(item.toAccountId, current + value)
         })
 
         return accounts.map((account) => {
             const initial = Number(account.initialBalance || 0)
             const movement = movementByAccount.get(account.id) || 0
-
-            return {
-                ...account,
-                balance: initial + movement,
-            }
+            return { ...account, balance: initial + movement }
         })
     }
 

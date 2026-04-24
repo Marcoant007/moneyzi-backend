@@ -188,11 +188,32 @@ model Account {
   userId         String
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
+  transfersFrom  Transfer[]  @relation("TransferFrom")
+  transfersTo    Transfer[]  @relation("TransferTo")
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   @@index([userId])
   @@index([userId, isActive])
+}
+
+model Transfer {
+  id            String   @id @default(uuid())
+  userId        String
+  fromAccountId String
+  toAccountId   String
+  amount        Decimal  @db.Decimal(10, 2)
+  note          String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  fromAccount Account @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccount   Account @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([fromAccountId])
+  @@index([toAccountId])
 }
 
 enum AccountType {

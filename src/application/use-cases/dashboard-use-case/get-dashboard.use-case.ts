@@ -71,8 +71,14 @@ export class GetDashboardUseCase {
                 : Promise.resolve([]),
         ])
 
-        const cardGroups = this.groupPaidCardStatements(dashboardTransactions)
-        const nonCardTransactions = dashboardTransactions.filter((transaction) => !transaction.creditCardId)
+        const SAVINGS_ACCOUNT_TYPES = ['PIGGY_BANK', 'SAVINGS', 'INVESTMENT']
+        const isLinkedToSavingsAccount = (t: DashboardTransaction) =>
+            !!(t as any).account && SAVINGS_ACCOUNT_TYPES.includes((t as any).account.type)
+
+        const mainTransactions = dashboardTransactions.filter((t) => !isLinkedToSavingsAccount(t))
+
+        const cardGroups = this.groupPaidCardStatements(mainTransactions)
+        const nonCardTransactions = mainTransactions.filter((transaction) => !transaction.creditCardId)
 
         const depositsTotal = nonCardTransactions
             .filter((transaction) => transaction.type === 'DEPOSIT')
