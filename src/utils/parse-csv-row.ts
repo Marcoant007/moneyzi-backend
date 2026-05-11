@@ -24,11 +24,16 @@ export function parseCsvRow(
                 )
                 break
 
-            case 'date':
-                transaction.date = value.includes('/')
-                    ? new Date(value.split('/').reverse().join('-'))
-                    : new Date(value)
+            case 'date': {
+                // Normaliza para ISO (YYYY-MM-DD) independente do formato de entrada
+                const isoStr = value.includes('/')
+                    ? value.split('/').reverse().join('-')
+                    : value
+                // Parsear como meio-dia UTC evita que o offset UTC-3 do Brasil
+                // jogue a data para o dia anterior quando exibida localmente.
+                transaction.date = new Date(`${isoStr}T12:00:00.000Z`)
                 break
+            }
 
             case 'name':
                 transaction.name = value
