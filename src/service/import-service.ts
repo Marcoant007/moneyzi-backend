@@ -2,6 +2,7 @@ import { OfxParser } from './parsers/ofx-parser'
 import { parseCsv } from '@/utils/parse-csv'
 import { publishToQueue } from '@/infra/queue/rabbitmq/rabbitmq'
 import { TransactionMessage } from '@/core/types/transaction-message'
+import { detectTransactionsBatchWithIA } from '@/core/gemini/detect-transactions-batch-with-ia'
 
 export class ImportService {
     static detectType(buffer: Buffer): 'csv' | 'ofx' | 'unknown' {
@@ -58,7 +59,15 @@ export class ImportService {
             }
         }
 
+        // Pré-classifica todas as transações em batch (reduz N chamadas Gemini para ceil(N/50))
+        const batchInputs = parsed.map((t) => ({
+            name: String(t.name ?? ''),
+            rawCategory: t.category ? String(t.category) : undefined,
+        }))
+        const classifications = await detectTransactionsBatchWithIA(normalizedUserId, batchInputs)
+
         for (const [index, transaction] of parsed.entries()) {
+            const classification = classifications[index]
             const message: TransactionMessage = {
                 ...transaction,
                 userId: normalizedUserId,
@@ -66,6 +75,10 @@ export class ImportService {
                 creditCardId,
                 isCreditCardInvoice: Boolean(isCreditCardInvoice),
                 statementAnchorDate: statementAnchorDate ?? undefined,
+                type: classification?.type,
+                category: classification?.category,
+                paymentMethod: classification?.paymentMethod,
+                categoryId: classification?.categoryId,
             }
 
             console.log(`Sending transaction ${index + 1}/${parsed.length} to queue:`, JSON.stringify({

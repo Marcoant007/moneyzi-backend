@@ -33,7 +33,8 @@ export class PrismaTransactionRepository implements TransactionRepository {
                     { paymentStatus: 'PAID', paidAt: { gte: startDate, lt: endDate } },
                     { paymentStatus: 'PAID', paidAt: null, dueDate: { gte: startDate, lt: endDate } },
                     { paymentStatus: 'PAID', paidAt: null, dueDate: null, date: { gte: startDate, lt: endDate } },
-                    { paymentStatus: { not: 'PAID' }, date: { gte: startDate, lt: endDate } },
+                    { paymentStatus: { not: 'PAID' }, dueDate: { gte: startDate, lt: endDate } },
+                    { paymentStatus: { not: 'PAID' }, dueDate: null, date: { gte: startDate, lt: endDate } },
                 ],
             },
             select: {
