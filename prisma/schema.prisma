@@ -18,8 +18,9 @@ model Transaction {
   paymentMethod  TransactionPaymentMethod
   date           DateTime
   dueDate        DateTime?
-  isRecurring    Boolean                    @default(false)
-  paymentStatus  PaymentStatus              @default(PENDING)
+  isRecurring        Boolean                    @default(false)
+  recurrenceGroupId  String?
+  paymentStatus      PaymentStatus              @default(PENDING)
   paidAt         DateTime?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
@@ -127,16 +128,17 @@ enum TransactionPaymentMethod {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  clerk_id      String?        @unique
-  email         String         @unique
-  name          String
-  createdAt     DateTime       @default(now())
-  transactions  Transaction[]
-  accounts      Account[]
-  categories    Category[]
-  notifications Notification[]
-  creditCards   CreditCard[]
+  id              String         @id @default(uuid())
+  clerk_id        String?        @unique
+  email           String         @unique
+  name            String
+  createdAt       DateTime       @default(now())
+  termsAcceptedAt DateTime?
+  transactions    Transaction[]
+  accounts        Account[]
+  categories      Category[]
+  notifications   Notification[]
+  creditCards     CreditCard[]
 }
 
 model Category {
@@ -232,4 +234,52 @@ enum CardBrand {
   AMEX
   HIPERCARD
   OTHER
+}
+
+enum SubscriptionStatus {
+  TRIAL_ACTIVE
+  TRIAL_EXPIRED
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  COURTESY
+}
+
+enum PlanInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum FeedbackReason {
+  TOO_EXPENSIVE
+  MISSING_FEATURES
+  NOT_USING
+  BUGS
+  FOUND_ALTERNATIVE
+  OTHER
+}
+
+model BillingStatus {
+  id                   String             @id @default(uuid())
+  userId               String             @unique
+  trialStartedAt       DateTime
+  trialEndsAt          DateTime
+  subscriptionStatus   SubscriptionStatus @default(TRIAL_ACTIVE)
+  planInterval         PlanInterval       @default(MONTHLY)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model TrialFeedback {
+  id        String         @id @default(uuid())
+  userId    String
+  reason    FeedbackReason
+  details   String
+  createdAt DateTime       @default(now())
+
+  @@index([userId])
 }

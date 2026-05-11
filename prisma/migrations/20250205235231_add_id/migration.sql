@@ -1,0 +1,1 @@
+-- Migration applied by moneyzi (frontend) — registered here as baseline

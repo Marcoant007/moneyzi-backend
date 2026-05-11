@@ -45,6 +45,19 @@ export class ImportService {
         const normalizedUserId = userId.trim()
         const statementAnchorDate = this.resolveStatementAnchorDate(parsed)
 
+        // Entradas com valor negativo em faturas de cartão representam pagamentos
+        // da fatura ou créditos/estornos — não devem ser importados como despesas.
+        if (isCreditCardInvoice) {
+            const before = parsed.length
+            parsed = parsed.filter(
+                (t) => typeof t.amount === 'number' && t.amount > 0
+            )
+            const filtered = before - parsed.length
+            if (filtered > 0) {
+                console.log(`Filtered ${filtered} negative/zero-amount entries from credit card invoice`)
+            }
+        }
+
         for (const [index, transaction] of parsed.entries()) {
             const message: TransactionMessage = {
                 ...transaction,
