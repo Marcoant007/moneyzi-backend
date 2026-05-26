@@ -25,6 +25,7 @@ export interface CardStatementItem {
     effectiveStatus: EffectiveStatus
     transactionIds: string[]
     itemCount: number
+    importJobId: string | null
 }
 
 export interface PayablesTotals {
@@ -175,6 +176,7 @@ export class GetPayablesReceivablesUseCase {
             dueDate: Date | null
             amount: any
             paymentStatus: PaymentStatus
+            importJobId?: string | null
             creditCard?: { name: string; dueDay?: number | null; closingDay?: number | null } | null
         }>,
         today: Date
@@ -187,6 +189,7 @@ export class GetPayablesReceivablesUseCase {
             transactionIds: string[]
             hasPending: boolean
             hasPaid: boolean
+            importJobIds: Set<string>
         }>()
 
         for (const transaction of cardTransactions) {
@@ -211,6 +214,7 @@ export class GetPayablesReceivablesUseCase {
                     transactionIds: [],
                     hasPending: false,
                     hasPaid: false,
+                    importJobIds: new Set(),
                 })
             }
 
@@ -220,6 +224,10 @@ export class GetPayablesReceivablesUseCase {
                 Number(transaction.amount),
             )
             group.transactionIds.push(transaction.id)
+
+            if (transaction.importJobId) {
+                group.importJobIds.add(transaction.importJobId)
+            }
 
             if (transaction.paymentStatus === 'PAID') {
                 group.hasPaid = true
@@ -237,6 +245,11 @@ export class GetPayablesReceivablesUseCase {
                 effectiveStatus = 'OVERDUE'
             }
 
+            // Expose importJobId only when all transactions share exactly one import job
+            const importJobId = group.importJobIds.size === 1
+                ? Array.from(group.importJobIds)[0]
+                : null
+
             return {
                 creditCardId: group.creditCardId,
                 cardName: group.cardName,
@@ -245,6 +258,7 @@ export class GetPayablesReceivablesUseCase {
                 effectiveStatus,
                 transactionIds: group.transactionIds,
                 itemCount: group.transactionIds.length,
+                importJobId,
             }
         })
     }

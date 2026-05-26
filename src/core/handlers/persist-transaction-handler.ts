@@ -53,6 +53,12 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
             : new Date(transaction.date)
         const computedDueDate = await this.resolveDueDate(transaction, persistedAt)
 
+        // Imported invoice transactions represent already-paid purchases.
+        // Mark them as PAID so they appear in dashboard category breakdowns.
+        const isImportedInvoice = Boolean(transaction.isCreditCardInvoice && transaction.importJobId)
+        const paymentStatus = isImportedInvoice ? 'PAID' : 'PENDING'
+        const paidAt = isImportedInvoice ? persistedAt : null
+
         const payload: Prisma.TransactionUncheckedCreateInput = {
             userId: transaction.userId,
             name: transaction.name,
@@ -67,6 +73,8 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
             importJobId: transaction.importJobId ?? null,
             creditCardId: transaction.creditCardId ?? null,
             isRecurring: transaction.isRecurring ?? false,
+            paymentStatus,
+            paidAt,
         }
 
         await this.transactionRepository.create(payload)

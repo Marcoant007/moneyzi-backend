@@ -2,12 +2,14 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import { StartImportUseCase } from '@/application/use-cases/import-use-case/start-import.use-case'
 import { GetImportJobStatusUseCase } from '@/application/use-cases/import-use-case/get-import-job-status.use-case'
 import { GetDashboardUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard.use-case'
+import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
 
 export class ImportController {
     constructor(
         private readonly startImportUseCase: StartImportUseCase,
         private readonly getImportJobStatusUseCase: GetImportJobStatusUseCase,
         private readonly getDashboardUseCase: GetDashboardUseCase,
+        private readonly importJobRepository?: ImportJobRepository,
     ) { }
 
     async importCsv(request: FastifyRequest, reply: FastifyReply) {
@@ -94,6 +96,33 @@ export class ImportController {
         } catch (error) {
             request.log.error(error)
             return reply.status(500).send({ error: 'Erro ao buscar job' })
+        }
+    }
+
+    async deleteImportJob(request: FastifyRequest, reply: FastifyReply) {
+        const { id } = request.params as { id: string }
+        const rawUserId = request.headers['x-user-id']
+        const userId = Array.isArray(rawUserId)
+            ? rawUserId.filter(Boolean)[0]?.trim()
+            : rawUserId?.trim()
+
+        if (!userId) {
+            return reply.status(401).send({ error: 'Unauthorized' })
+        }
+
+        if (!this.importJobRepository) {
+            return reply.status(501).send({ error: 'Não implementado' })
+        }
+
+        try {
+            const deleted = await this.importJobRepository.delete(id, userId)
+            if (!deleted) {
+                return reply.status(404).send({ error: 'Importação não encontrada' })
+            }
+            return reply.status(204).send()
+        } catch (error) {
+            request.log.error(error)
+            return reply.status(500).send({ error: 'Erro ao excluir importação' })
         }
     }
 

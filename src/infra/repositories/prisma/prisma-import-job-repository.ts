@@ -54,4 +54,16 @@ export class PrismaImportJobRepository implements ImportJobRepository {
     async findById(id: string): Promise<ImportJob | null> {
         return prisma.importJob.findUnique({ where: { id } })
     }
+
+    async delete(id: string, userId: string): Promise<boolean> {
+        const job = await prisma.importJob.findUnique({ where: { id } })
+        if (!job || job.userId !== userId) return false
+
+        await prisma.$transaction([
+            prisma.transaction.deleteMany({ where: { importJobId: id } }),
+            prisma.importJob.delete({ where: { id } }),
+        ])
+
+        return true
+    }
 }

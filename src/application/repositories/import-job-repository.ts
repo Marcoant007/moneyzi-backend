@@ -11,4 +11,5 @@ export interface ImportJobRepository {
     registerAttempt(id: string, didFail: boolean): Promise<ImportJob | null>
     markStatus(id: string, status: ImportJobStatus): Promise<void>
     findById(id: string): Promise<ImportJob | null>
+    delete(id: string, userId: string): Promise<boolean>
 }

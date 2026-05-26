@@ -24,6 +24,8 @@ export async function importRoutes(app: FastifyInstance) {
     app.get('/dashboard', (request, reply) => importController.getDashboard(request, reply))
 
     app.get('/import/:id', (request, reply) => importController.getImportJobStatus(request, reply))
+
+    app.delete('/import-jobs/:id', (request, reply) => importController.deleteImportJob(request, reply))
 }
 
 const importController = buildImportController()
@@ -42,5 +44,5 @@ function buildImportController(): ImportController {
         accountRepository,
     )
 
-    return new ImportController(startImportUseCase, getImportJobStatusUseCase, getDashboardUseCase)
+    return new ImportController(startImportUseCase, getImportJobStatusUseCase, getDashboardUseCase, importJobRepository)
 }
