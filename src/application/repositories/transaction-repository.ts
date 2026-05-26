@@ -7,8 +7,58 @@ export interface PayablesFilter {
     status?: PaymentStatus
 }
 
+export interface TransactionListItem {
+    id: string
+    name: string
+    description: string | null
+    type: TransactionType
+    amount: number
+    category: TransactionCategory
+    paymentMethod: TransactionPaymentMethod
+    date: Date
+    dueDate: Date | null
+    isRecurring: boolean
+    paymentStatus: PaymentStatus
+    paidAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    deletedAt: Date | null
+    userId: string
+    categoryId: string | null
+    creditCardId: string | null
+    accountId: string | null
+    categoryRef: { id: string; name: string } | null
+    account: { id: string; name: string } | null
+}
+
+export interface UpsertTransactionData {
+    id?: string
+    name: string
+    amount: number
+    type: TransactionType
+    category: TransactionCategory
+    categoryId?: string | null
+    accountId?: string | null
+    creditCardId?: string | null
+    paymentMethod: TransactionPaymentMethod
+    date: Date
+    dueDate?: Date | null
+    isRecurring?: boolean
+    paymentStatus?: PaymentStatus
+    userId: string
+}
+
 export interface TransactionRepository {
     create(data: Prisma.TransactionUncheckedCreateInput): Promise<void>
+    findMany(userId: string, filters: { month: number; year: number; accountId?: string }): Promise<TransactionListItem[]>
+    countCurrentMonth(userId: string): Promise<number>
+    upsert(data: UpsertTransactionData): Promise<void>
+    hardDelete(id: string, userId: string): Promise<void>
+    updateManyCategory(ids: string[], userId: string, data: { category?: TransactionCategory; categoryId?: string | null }): Promise<number>
+    updateAmount(id: string, userId: string, amount: number): Promise<void>
+    findManyByIds(ids: string[], userId: string): Promise<Array<{ id: string; amount: Decimal; creditCardId: string | null; dueDate: Date | null; category: TransactionCategory; paymentMethod: TransactionPaymentMethod; accountId: string | null }>>
+    groupAccountMovements(userId: string, accountId: string): Promise<Array<{ type: TransactionType; _sum: { amount: Decimal | null } }>>
+    groupAllAccountsMovements(userId: string): Promise<Array<{ accountId: string | null; type: TransactionType; _sum: { amount: Decimal | null } }>>
     findByCategory(categoryId: string, userId: string, month?: string, year?: string): Promise<Array<{
         id: string
         name: string

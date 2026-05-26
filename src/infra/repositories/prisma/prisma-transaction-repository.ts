@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
+import type { TransactionRepository, PayablesFilter, UpsertTransactionData } from '@/application/repositories/transaction-repository'
 import type { Prisma, TransactionCategory, TransactionType } from '@prisma/client'
 
 // Categorias que são consideradas fixas mesmo sem o flag isRecurring=true
@@ -17,6 +17,104 @@ const FIXED_ENUM_CATEGORIES: TransactionCategory[] = [
 export class PrismaTransactionRepository implements TransactionRepository {
     async create(data: Prisma.TransactionUncheckedCreateInput): Promise<void> {
         await prisma.transaction.create({ data })
+    }
+
+    async findMany(userId: string, filters: { month: number; year: number; accountId?: string }) {
+        const { month, year, accountId } = filters
+        const transactions = await prisma.transaction.findMany({
+            where: {
+                userId,
+                ...(accountId ? { accountId } : {}),
+                date: {
+                    gte: new Date(year, month - 1, 1),
+                    lt: new Date(year, month, 1),
+                },
+            },
+            include: {
+                categoryRef: { select: { id: true, name: true } },
+                account: { select: { id: true, name: true } },
+            },
+            orderBy: { date: 'desc' },
+        })
+        return transactions.map(t => ({ ...t, amount: Number(t.amount) })) as any
+    }
+
+    async countCurrentMonth(userId: string): Promise<number> {
+        const now = new Date()
+        const start = new Date(now.getFullYear(), now.getMonth(), 1)
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        return prisma.transaction.count({
+            where: { userId, createdAt: { gte: start, lt: end } },
+        })
+    }
+
+    async upsert(data: UpsertTransactionData): Promise<void> {
+        const { id, userId, amount, paymentStatus, date, ...rest } = data
+        const status = paymentStatus ?? 'PAID'
+        const paidAt = status === 'PAID' ? (date ?? new Date()) : null
+        const amountStr = String(amount)
+
+        if (id) {
+            await prisma.transaction.upsert({
+                where: { id },
+                update: { ...rest, userId, amount: amountStr, paymentStatus: status, date },
+                create: { ...rest, id, userId, amount: amountStr, paymentStatus: status, date, paidAt },
+            })
+        } else {
+            await prisma.transaction.create({
+                data: { ...rest, userId, amount: amountStr, paymentStatus: status, date, paidAt },
+            })
+        }
+    }
+
+    async hardDelete(id: string, userId: string): Promise<void> {
+        await prisma.transaction.delete({ where: { id, userId } })
+    }
+
+    async updateManyCategory(ids: string[], userId: string, data: { category?: TransactionCategory; categoryId?: string | null }): Promise<number> {
+        const result = await prisma.transaction.updateMany({
+            where: { id: { in: ids }, userId },
+            data,
+        })
+        return result.count
+    }
+
+    async updateAmount(id: string, userId: string, amount: number): Promise<void> {
+        await prisma.transaction.update({
+            where: { id, userId },
+            data: { amount: String(amount) },
+        })
+    }
+
+    async findManyByIds(ids: string[], userId: string) {
+        return prisma.transaction.findMany({
+            where: { id: { in: ids }, userId },
+            select: {
+                id: true,
+                amount: true,
+                creditCardId: true,
+                dueDate: true,
+                category: true,
+                paymentMethod: true,
+                accountId: true,
+            },
+        })
+    }
+
+    async groupAccountMovements(userId: string, accountId: string) {
+        return prisma.transaction.groupBy({
+            by: ['type'],
+            where: { userId, accountId, deletedAt: null },
+            _sum: { amount: true },
+        })
+    }
+
+    async groupAllAccountsMovements(userId: string) {
+        return prisma.transaction.groupBy({
+            by: ['accountId', 'type'],
+            where: { userId, accountId: { not: null }, deletedAt: null },
+            _sum: { amount: true },
+        })
     }
 
     async findByCategory(categoryId: string, userId: string, month?: string, year?: string) {

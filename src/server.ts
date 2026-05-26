@@ -12,6 +12,8 @@ import { creditCardRoutes } from '@routes/credit-card.route'
 import { payablesRoutes } from '@routes/payables.route'
 import { accountRoutes } from '@routes/account.route'
 import { transferRoutes } from '@routes/transfer.route'
+import { transactionRoutes } from '@routes/transaction.route'
+import { meRoutes } from '@routes/me.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -40,6 +42,8 @@ async function bootstrap() {
         protectedApp.register(payablesRoutes)
         protectedApp.register(accountRoutes)
         protectedApp.register(transferRoutes)
+        protectedApp.register(transactionRoutes)
+        protectedApp.register(meRoutes)
     })
 
     if (process.env.DISABLE_QUEUE === 'true') {
