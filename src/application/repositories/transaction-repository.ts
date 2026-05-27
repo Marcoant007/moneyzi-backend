@@ -66,6 +66,13 @@ export interface TransactionRepository {
         date: Date
         paymentMethod: string
     }>>
+    findByEnumCategory(category: string, userId: string, month?: string, year?: string): Promise<Array<{
+        id: string
+        name: string
+        amount: number
+        date: Date
+        paymentMethod: string
+    }>>
     groupTotalsByType(userId?: string, range?: { start: Date; end: Date }): Promise<Array<{ type: TransactionType; _sum: { amount: Decimal | null } }>>
     groupExpensesByCategory(userId?: string, range?: { start: Date; end: Date }): Promise<Array<{ category: TransactionCategory; categoryId: string | null; _sum: { amount: Decimal | null } }>>
     groupExpensesByCategoryId(userId: string, range?: { start: Date; end: Date }): Promise<Array<{ categoryId: string | null; category: TransactionCategory; _sum: { amount: Decimal | null } }>>

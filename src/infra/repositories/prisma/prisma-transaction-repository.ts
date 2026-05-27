@@ -136,8 +136,9 @@ export class PrismaTransactionRepository implements TransactionRepository {
                 categoryId,
                 userId,
                 deletedAt: null,
-                // Mirror the same date-resolution logic as findDashboardTransactions
                 OR: [
+                    // Credit card invoice transactions: always filter by dueDate (invoice month)
+                    { paymentStatus: 'PAID', creditCardId: { not: null }, dueDate: { gte: startDate, lt: endDate } },
                     { paymentStatus: 'PAID', paidAt: { gte: startDate, lt: endDate } },
                     { paymentStatus: 'PAID', paidAt: null, dueDate: { gte: startDate, lt: endDate } },
                     { paymentStatus: 'PAID', paidAt: null, dueDate: null, date: { gte: startDate, lt: endDate } },
@@ -163,6 +164,39 @@ export class PrismaTransactionRepository implements TransactionRepository {
             amount: Number(t.amount),
             date: t.date,
             paymentMethod: t.paymentMethod || 'Não informado'
+        }))
+    }
+
+    async findByEnumCategory(category: string, userId: string, month?: string, year?: string) {
+        const startDate = new Date(parseInt(year || '2024'), parseInt(month || '1') - 1, 1)
+        const endDate = new Date(parseInt(year || '2024'), parseInt(month || '1'), 1)
+
+        const transactions = await prisma.transaction.findMany({
+            where: {
+                category: category as any,
+                categoryId: null,
+                userId,
+                deletedAt: null,
+                type: 'EXPENSE',
+                OR: [
+                    { paymentStatus: 'PAID', creditCardId: { not: null }, dueDate: { gte: startDate, lt: endDate } },
+                    { paymentStatus: 'PAID', paidAt: { gte: startDate, lt: endDate } },
+                    { paymentStatus: 'PAID', paidAt: null, dueDate: { gte: startDate, lt: endDate } },
+                    { paymentStatus: 'PAID', paidAt: null, dueDate: null, date: { gte: startDate, lt: endDate } },
+                    { paymentStatus: { not: 'PAID' }, dueDate: { gte: startDate, lt: endDate } },
+                    { paymentStatus: { not: 'PAID' }, dueDate: null, date: { gte: startDate, lt: endDate } },
+                ],
+            },
+            select: { id: true, name: true, amount: true, date: true, paymentMethod: true },
+            orderBy: { date: 'desc' },
+        })
+
+        return transactions.map(t => ({
+            id: t.id,
+            name: t.name,
+            amount: Number(t.amount),
+            date: t.date,
+            paymentMethod: t.paymentMethod || 'Não informado',
         }))
     }
 
