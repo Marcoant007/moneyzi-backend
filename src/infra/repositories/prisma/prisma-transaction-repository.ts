@@ -136,6 +136,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
                 categoryId,
                 userId,
                 deletedAt: null,
+                type: 'EXPENSE',
                 OR: [
                     // Credit card invoice transactions: always filter by dueDate (invoice month)
                     { paymentStatus: 'PAID', creditCardId: { not: null }, dueDate: { gte: startDate, lt: endDate } },

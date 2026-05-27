@@ -24,7 +24,6 @@ const ENUM_CATEGORY_LABEL: Record<string, string> = {
     ENTERTAINMENT: 'Entretenimento',
     HEALTH: 'Saúde',
     UTILITY: 'Utilidades',
-    SALARY: 'Salário',
     EDUCATION: 'Educação',
     OTHER: 'Outros (sem categoria)',
     SIGNATURE: 'Assinaturas',
