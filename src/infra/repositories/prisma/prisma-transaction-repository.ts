@@ -21,14 +21,24 @@ export class PrismaTransactionRepository implements TransactionRepository {
 
     async findMany(userId: string, filters: { month: number; year: number; accountId?: string }) {
         const { month, year, accountId } = filters
+        const startDate = new Date(year, month - 1, 1)
+        const endDate = new Date(year, month, 1)
+
         const transactions = await prisma.transaction.findMany({
             where: {
                 userId,
-                ...(accountId ? { accountId } : {}),
-                date: {
-                    gte: new Date(year, month - 1, 1),
-                    lt: new Date(year, month, 1),
-                },
+                deletedAt: null,
+                OR: [
+                    {
+                        creditCardId: null,
+                        ...(accountId ? { accountId } : {}),
+                        date: { gte: startDate, lt: endDate },
+                    },
+                    {
+                        creditCardId: { not: null },
+                        dueDate: { gte: startDate, lt: endDate },
+                    },
+                ],
             },
             include: {
                 categoryRef: { select: { id: true, name: true } },
