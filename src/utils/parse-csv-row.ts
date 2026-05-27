@@ -46,6 +46,7 @@ export function parseCsvRow(
                 break
 
             case 'category':
+                transaction.rawCategoryText = value
                 if (Object.values(TransactionCategory).includes(value as TransactionCategory)) {
                     transaction.category = value as TransactionCategory
                 }

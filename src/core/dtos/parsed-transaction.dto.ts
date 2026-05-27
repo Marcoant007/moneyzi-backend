@@ -6,5 +6,6 @@ export interface ParsedTransaction {
     date: Date
     type?: TransactionType
     category?: TransactionCategory
+    rawCategoryText?: string
     paymentMethod?: TransactionPaymentMethod
 }

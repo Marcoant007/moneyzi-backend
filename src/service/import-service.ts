@@ -62,7 +62,7 @@ export class ImportService {
         // Pré-classifica todas as transações em batch (reduz N chamadas Gemini para ceil(N/50))
         const batchInputs = parsed.map((t) => ({
             name: String(t.name ?? ''),
-            rawCategory: t.category ? String(t.category) : undefined,
+            rawCategory: t.category ? String(t.category) : (t.rawCategoryText ?? undefined),
         }))
         const classifications = await detectTransactionsBatchWithIA(normalizedUserId, batchInputs)
 
