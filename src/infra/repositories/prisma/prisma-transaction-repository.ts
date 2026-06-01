@@ -552,4 +552,23 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
+    async findRecurringNextOccurrence(userId: string, name: string, month: number, year: number): Promise<{ id: string } | null> {
+        const start = new Date(year, month - 1, 1)
+        const end = new Date(year, month, 1)
+
+        return prisma.transaction.findFirst({
+            where: {
+                userId,
+                name,
+                isRecurring: true,
+                deletedAt: null,
+                OR: [
+                    { dueDate: { gte: start, lt: end } },
+                    { dueDate: null, date: { gte: start, lt: end } },
+                ],
+            },
+            select: { id: true },
+        })
+    }
+
 }

@@ -99,4 +99,5 @@ export interface TransactionRepository {
     findReceivables(userId: string, filters?: PayablesFilter): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     markAsPaid(ids: string[], paidAt?: Date): Promise<void>
     markAsPending(ids: string[]): Promise<void>
+    findRecurringNextOccurrence(userId: string, name: string, month: number, year: number): Promise<{ id: string } | null>
 }

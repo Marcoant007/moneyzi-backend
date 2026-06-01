@@ -27,11 +27,72 @@ export class SettlePayableUseCase {
 
         if (input.mode === 'PAY') {
             await this.transactionRepository.markAsPaid(ids)
+
+            if (input.scope === 'TRANSACTION' && ids.length === 1) {
+                await this.maybeCreateNextOccurrence(input.userId, ids[0])
+            }
         } else {
             await this.transactionRepository.markAsPending(ids)
         }
 
         return { updatedCount: ids.length }
+    }
+
+    private async maybeCreateNextOccurrence(userId: string, transactionId: string): Promise<void> {
+        const transaction = await prisma.transaction.findFirst({
+            where: { id: transactionId, userId, deletedAt: null },
+        })
+
+        if (!transaction || !transaction.isRecurring) return
+
+        const baseDueDate = transaction.dueDate ?? transaction.date
+        const nextDueDate = this.addOneMonth(baseDueDate)
+        const nextDate = this.addOneMonth(transaction.date)
+
+        const nextMonth = nextDueDate.getMonth() + 1
+        const nextYear = nextDueDate.getFullYear()
+
+        const existing = await this.transactionRepository.findRecurringNextOccurrence(
+            userId,
+            transaction.name,
+            nextMonth,
+            nextYear,
+        )
+
+        if (existing) return
+
+        const payload: Parameters<typeof prisma.transaction.create>[0]['data'] = {
+            userId: transaction.userId,
+            name: transaction.name,
+            description: transaction.description,
+            type: transaction.type,
+            amount: transaction.amount,
+            category: transaction.category,
+            paymentMethod: transaction.paymentMethod,
+            date: nextDate,
+            dueDate: transaction.dueDate ? nextDueDate : null,
+            isRecurring: true,
+            recurrenceGroupId: transaction.recurrenceGroupId,
+            categoryId: transaction.categoryId,
+            accountId: transaction.accountId,
+            paymentStatus: 'PENDING',
+            paidAt: null,
+        }
+
+        await this.transactionRepository.create(payload as any)
+    }
+
+    private addOneMonth(date: Date): Date {
+        const year = date.getFullYear()
+        const month = date.getMonth()
+        const day = date.getDate()
+
+        const nextMonth = month + 1
+        const nextYear = year + Math.floor(nextMonth / 12)
+        const nextMonthNormalized = nextMonth % 12
+        const lastDay = new Date(nextYear, nextMonthNormalized + 1, 0).getDate()
+
+        return new Date(nextYear, nextMonthNormalized, Math.min(day, lastDay), 12, 0, 0, 0)
     }
 
     private async resolveIds(input: SettlePayableInput): Promise<string[]> {

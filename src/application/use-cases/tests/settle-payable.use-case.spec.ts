@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     findCard: vi.fn(),
     findTransactions: vi.fn(),
     findFirstTransaction: vi.fn(),
+    createTransaction: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -16,6 +17,7 @@ vi.mock('@/lib/prisma', () => ({
         transaction: {
             findMany: mocks.findTransactions,
             findFirst: mocks.findFirstTransaction,
+            create: mocks.createTransaction,
         },
     },
 }))
@@ -30,13 +32,17 @@ describe('SettlePayableUseCase', () => {
         transactionRepository = {
             markAsPaid: vi.fn(),
             markAsPending: vi.fn(),
+            findRecurringNextOccurrence: vi.fn().mockResolvedValue(null),
+            create: vi.fn(),
         } as unknown as TransactionRepository
 
         sut = new SettlePayableUseCase(transactionRepository)
     })
 
-    it('should settle a single transaction as paid', async () => {
-        mocks.findFirstTransaction.mockResolvedValue({ id: 'tx-1' })
+    it('should settle a single non-recurring transaction as paid', async () => {
+        mocks.findFirstTransaction
+            .mockResolvedValueOnce({ id: 'tx-1' })           // resolveIds
+            .mockResolvedValueOnce({ id: 'tx-1', isRecurring: false }) // maybeCreateNextOccurrence
 
         const result = await sut.execute({
             userId: 'user-1',
@@ -45,17 +51,98 @@ describe('SettlePayableUseCase', () => {
             transactionId: 'tx-1',
         })
 
-        expect(mocks.findFirstTransaction).toHaveBeenCalledWith({
-            where: { id: 'tx-1', userId: 'user-1', deletedAt: null },
-            select: { id: true },
-        })
         expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1'])
         expect(transactionRepository.markAsPending).not.toHaveBeenCalled()
+        expect(transactionRepository.create).not.toHaveBeenCalled()
         expect(result).toEqual({ updatedCount: 1 })
     })
 
+    it('should auto-create next month occurrence when paying a recurring transaction', async () => {
+        const dueDate = new Date(2026, 4, 8, 12, 0, 0, 0) // May 8 2026
+
+        mocks.findFirstTransaction
+            .mockResolvedValueOnce({ id: 'tx-1' }) // resolveIds
+            .mockResolvedValueOnce({               // maybeCreateNextOccurrence
+                id: 'tx-1',
+                userId: 'user-1',
+                name: 'Aluguel',
+                description: null,
+                type: 'EXPENSE',
+                amount: '2899.54',
+                category: 'HOUSING',
+                paymentMethod: 'BANK_TRANSFER',
+                date: dueDate,
+                dueDate,
+                isRecurring: true,
+                recurrenceGroupId: null,
+                categoryId: null,
+                accountId: null,
+            })
+
+        const result = await sut.execute({
+            userId: 'user-1',
+            mode: 'PAY',
+            scope: 'TRANSACTION',
+            transactionId: 'tx-1',
+        })
+
+        expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1'])
+        expect(transactionRepository.findRecurringNextOccurrence).toHaveBeenCalledWith(
+            'user-1',
+            'Aluguel',
+            6,    // June
+            2026,
+        )
+        expect(transactionRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'user-1',
+                name: 'Aluguel',
+                isRecurring: true,
+                paymentStatus: 'PENDING',
+                paidAt: null,
+                dueDate: new Date(2026, 5, 8, 12, 0, 0, 0), // June 8 2026
+            }),
+        )
+        expect(result).toEqual({ updatedCount: 1 })
+    })
+
+    it('should not create next occurrence if one already exists', async () => {
+        const dueDate = new Date(2026, 4, 8, 12, 0, 0, 0)
+
+        mocks.findFirstTransaction
+            .mockResolvedValueOnce({ id: 'tx-1' })
+            .mockResolvedValueOnce({
+                id: 'tx-1',
+                userId: 'user-1',
+                name: 'Aluguel',
+                description: null,
+                type: 'EXPENSE',
+                amount: '2899.54',
+                category: 'HOUSING',
+                paymentMethod: 'BANK_TRANSFER',
+                date: dueDate,
+                dueDate,
+                isRecurring: true,
+                recurrenceGroupId: null,
+                categoryId: null,
+                accountId: null,
+            })
+
+        ;(transactionRepository.findRecurringNextOccurrence as ReturnType<typeof vi.fn>)
+            .mockResolvedValue({ id: 'tx-already-exists' })
+
+        await sut.execute({
+            userId: 'user-1',
+            mode: 'PAY',
+            scope: 'TRANSACTION',
+            transactionId: 'tx-1',
+        })
+
+        expect(transactionRepository.create).not.toHaveBeenCalled()
+    })
+
     it('should settle a single transaction as pending when mode is UNPAY', async () => {
-        mocks.findFirstTransaction.mockResolvedValue({ id: 'tx-1' })
+        mocks.findFirstTransaction.mockResolvedValueOnce({ id: 'tx-1' })
 
         const result = await sut.execute({
             userId: 'user-1',
