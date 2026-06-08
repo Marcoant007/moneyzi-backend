@@ -5,6 +5,17 @@ vi.mock('@/infra/queue/rabbitmq/rabbitmq', () => ({
     publishToQueue: vi.fn(),
 }))
 
+vi.mock('@/core/gemini/detect-transactions-batch-with-ia', () => ({
+    detectTransactionsBatchWithIA: vi.fn().mockResolvedValue([
+        {
+            type: 'EXPENSE',
+            category: 'Alimentação',
+            paymentMethod: 'DEBIT_CARD',
+            categoryId: null,
+        },
+    ]),
+}))
+
 describe('ImportService', () => {
     it('detects CSV type', () => {
         const csv = Buffer.from('date,descricao,valor')
