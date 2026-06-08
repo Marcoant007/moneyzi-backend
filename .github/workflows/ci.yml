@@ -17,7 +17,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "18"
+                  node-version: "20"
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -68,7 +68,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "18"
+                  node-version: "20"
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -107,7 +107,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "18"
+                  node-version: "20"
 
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
@@ -145,4 +145,4 @@ jobs:
             - name: Check commit messages
               uses: wagoid/commitlint-github-action@v6
               with:
-                  configFile: commitlint.config.js
+                  configFile: commitlint.config.mjs
