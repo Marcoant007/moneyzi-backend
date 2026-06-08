@@ -11,7 +11,6 @@ export class GeminiCategorizationHandler extends AbstractTransactionHandler {
     async handle(transaction: TransactionMessage): Promise<TransactionMessage> {
         if (!transaction.name) return super.handle(transaction)
 
-        // Já pré-classificado pelo batch no import — pula chamada individual ao Gemini
         if (transaction.type && transaction.category && transaction.paymentMethod) {
             return super.handle(transaction)
         }
