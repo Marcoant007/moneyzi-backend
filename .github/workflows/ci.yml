@@ -6,9 +6,45 @@ on:
             - main
 
 jobs:
-    ci:
-        name: Build and Test
+    build:
+        name: Build
         runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: "10.6.3"
+
+            - name: Cache pnpm store
+              uses: actions/cache@v4
+              with:
+                  path: ~/.pnpm-store
+                  key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Generate Prisma Client
+              run: pnpm exec prisma generate
+
+            - name: Build
+              run: pnpm run build
+
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        needs: build
 
         services:
             postgres:
@@ -34,6 +70,11 @@ jobs:
               with:
                   node-version: "18"
 
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: "10.6.3"
+
             - name: Cache pnpm store
               uses: actions/cache@v4
               with:
@@ -42,10 +83,44 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-pnpm-
 
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Generate Prisma Client
+              run: pnpm exec prisma generate
+
+            - name: Run tests
+              run: pnpm run test:coverage
+              env:
+                  DATABASE_URL: postgres://postgres:password@localhost:5432/moneyzi_test
+                  NODE_ENV: test
+
+    lint:
+        name: Lint
+        runs-on: ubuntu-latest
+        needs: test
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
               with:
                   version: "10.6.3"
+
+            - name: Cache pnpm store
+              uses: actions/cache@v4
+              with:
+                  path: ~/.pnpm-store
+                  key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -53,11 +128,21 @@ jobs:
             - name: Generate Prisma Client
               run: pnpm exec prisma generate
 
-            - name: Build
-              run: pnpm run build
+            - name: Type check
+              run: pnpm exec tsc --noEmit
 
-            - name: Run tests
-              run: pnpm run test:coverage
-              env:
-                  DATABASE_URL: postgres://postgres:password@localhost:5432/moneyzi_test
-                  NODE_ENV: test
+    commitlint:
+        name: Commit Lint
+        runs-on: ubuntu-latest
+        needs: lint
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Check commit messages
+              uses: wagoid/commitlint-github-action@v6
+              with:
+                  configFile: commitlint.config.js
