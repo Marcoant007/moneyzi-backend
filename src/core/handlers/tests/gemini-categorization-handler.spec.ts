@@ -3,7 +3,6 @@ import { GeminiCategorizationHandler } from '../gemini-categorization-handler'
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import type { TransactionMessage } from '@/core/types/transaction-message'
 
-// ── Mock Gemini ───────────────────────────────────────────────────────────────
 const mocks = vi.hoisted(() => ({
     detectTransactionDataWithIA: vi.fn(),
 }))
@@ -12,7 +11,6 @@ vi.mock('@/core/gemini/detect-transaction-data-with-ia', () => ({
     detectTransactionDataWithIA: mocks.detectTransactionDataWithIA,
 }))
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function makeRepo(overrides: Partial<CategoryRepository> = {}): CategoryRepository {
     return {
         listByUserId: vi.fn().mockResolvedValue([]),
@@ -34,7 +32,6 @@ function makeTx(overrides: Partial<TransactionMessage> = {}): TransactionMessage
     }
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
 describe('GeminiCategorizationHandler', () => {
     let sut: GeminiCategorizationHandler
     let repo: CategoryRepository
@@ -54,11 +51,10 @@ describe('GeminiCategorizationHandler', () => {
         })
     })
 
-    // ── Invoice import — type/paymentMethod must always be forced ─────────────
 
     it('força type=EXPENSE em importação de fatura mesmo que Gemini diga DEPOSIT', async () => {
         mocks.detectTransactionDataWithIA.mockResolvedValue({
-            type: 'DEPOSIT',           // Gemini errou — achou que é receita
+            type: 'DEPOSIT',
             category: 'OTHER',
             paymentMethod: 'PIX',
             categoryId: undefined,
@@ -177,7 +173,6 @@ describe('GeminiCategorizationHandler', () => {
         expect(result.categoryId).toBe('cat-123')
     })
 
-    // ── Sem nome — passa direto sem chamar Gemini ─────────────────────────────
 
     it('não chama Gemini quando transaction.name está ausente', async () => {
         const tx = makeTx({ name: undefined })
