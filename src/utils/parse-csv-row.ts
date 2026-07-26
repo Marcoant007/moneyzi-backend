@@ -1,5 +1,6 @@
 import { ParsedTransaction } from '@/core/dtos/parsed-transaction.dto'
 import { TransactionCategory, TransactionPaymentMethod, TransactionType } from '@prisma/client'
+import { resolveCategoryFromText } from './csv-category-dictionary'
 
 export function parseCsvRow(
     row: Record<string, string>,
@@ -49,6 +50,15 @@ export function parseCsvRow(
                 transaction.rawCategoryText = value
                 if (Object.values(TransactionCategory).includes(value as TransactionCategory)) {
                     transaction.category = value as TransactionCategory
+                } else {
+                    // Bancos como o Inter já entregam a categoria pronta no CSV, só que em
+                    // texto livre em português — tentamos casar com o dicionário antes de
+                    // depender da IA (ver docs/plano-correcao-categorizacao-import-inter.md).
+                    const resolved = resolveCategoryFromText(value)
+                    if (resolved) {
+                        transaction.category = resolved.category
+                        transaction.categoryName = resolved.categoryName
+                    }
                 }
                 break
 

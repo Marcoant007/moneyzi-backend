@@ -32,4 +32,48 @@ describe('parseCsvRow', () => {
     expect(parsed.paymentMethod).toBe('CREDIT_CARD')
     expect((parsed as any).Empty).toBeUndefined()
   })
+
+  it('resolves a real-world Portuguese category (e.g. Inter CSV) via the dictionary', () => {
+    const row = {
+      Descricao: 'Compra Supermercado',
+      Valor: 'R$ 50,00',
+      Data: '01/02/2025',
+      Categoria: 'Supermercado',
+    }
+
+    const headerMap = {
+      Descricao: 'name',
+      Valor: 'amount',
+      Data: 'date',
+      Categoria: 'category',
+    } as Record<string, any>
+
+    const parsed = parseCsvRow(row, headerMap)
+
+    expect(parsed.rawCategoryText).toBe('Supermercado')
+    expect(parsed.category).toBe('FOOD')
+    expect(parsed.categoryName).toBe('Alimentação')
+  })
+
+  it('keeps only rawCategoryText when the CSV category is not recognized', () => {
+    const row = {
+      Descricao: 'Loja XYZ',
+      Valor: 'R$ 50,00',
+      Data: '01/02/2025',
+      Categoria: 'Categoria Desconhecida Que Ninguem Usa',
+    }
+
+    const headerMap = {
+      Descricao: 'name',
+      Valor: 'amount',
+      Data: 'date',
+      Categoria: 'category',
+    } as Record<string, any>
+
+    const parsed = parseCsvRow(row, headerMap)
+
+    expect(parsed.rawCategoryText).toBe('Categoria Desconhecida Que Ninguem Usa')
+    expect(parsed.category).toBeUndefined()
+    expect(parsed.categoryName).toBeUndefined()
+  })
 })

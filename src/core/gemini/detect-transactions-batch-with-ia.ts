@@ -25,10 +25,14 @@ export interface BatchTransactionResult {
     paymentMethod: TransactionPaymentMethod
     categoryId?: string
     categoryName?: string
+    // Marca resultados que vieram da classificação padrão (falha na IA), não de uma
+    // resposta real do Gemini — permite medir/logar degradação da importação
+    // (ver docs/plano-correcao-categorizacao-import-inter.md, Etapa 3).
+    usedFallback?: boolean
 }
 
 function fallback(): BatchTransactionResult {
-    return { type: 'EXPENSE', category: 'OTHER', paymentMethod: 'CREDIT_CARD' }
+    return { type: 'EXPENSE', category: 'OTHER', paymentMethod: 'CREDIT_CARD', usedFallback: true }
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -38,7 +42,18 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     })
 }
 
-async function classifyBatch(
+// Erro "estrutural" da tentativa de classificação (esgotou retries de 429, resposta
+// não é um array do tamanho esperado, ou qualquer outra falha na chamada/parse).
+// `isRateLimited` diferencia o caso em que dividir o lote não ajudaria (cota da API
+// esgotada afeta qualquer sub-lote igual) do caso em que vale a pena isolar o item
+// problemático (JSON malformado, timeout pontual, erro de rede transitório).
+class BatchClassificationError extends Error {
+    constructor(message: string, readonly isRateLimited: boolean) {
+        super(message)
+    }
+}
+
+async function attemptClassifyBatch(
     items: BatchTransactionInput[],
     userCategoryNames: string[],
 ): Promise<BatchTransactionResult[]> {
@@ -77,8 +92,10 @@ ${lines.join('\n')}`
             const parsed: any[] = JSON.parse(text)
 
             if (!Array.isArray(parsed) || parsed.length !== items.length) {
-                console.warn(`Batch response length mismatch: expected ${items.length}, got ${parsed.length}`)
-                return items.map(() => fallback())
+                throw new BatchClassificationError(
+                    `Batch response length mismatch: expected ${items.length}, got ${Array.isArray(parsed) ? parsed.length : typeof parsed}`,
+                    false,
+                )
             }
 
             return parsed.map((p) => {
@@ -97,6 +114,8 @@ ${lines.join('\n')}`
                 }
             })
         } catch (error: any) {
+            if (error instanceof BatchClassificationError) throw error
+
             const is429 = error?.status === 429 || error?.statusText === 'Too Many Requests'
 
             if (is429 && attempt < MAX_RETRIES) {
@@ -116,12 +135,54 @@ ${lines.join('\n')}`
                 continue
             }
 
-            console.error('Erro na classificação em batch:', error)
-            return items.map(() => fallback())
+            throw new BatchClassificationError(error?.message ?? String(error), is429)
         }
     }
 
-    return items.map(() => fallback())
+    throw new BatchClassificationError('Retries esgotados', false)
+}
+
+// Classifica um lote e, se a chamada falhar por um motivo que dividir o lote pode
+// resolver (JSON malformado, timeout pontual, erro de rede — não cota esgotada),
+// divide o lote ao meio e tenta cada metade de forma isolada, recursivamente, até
+// o nível de item único. Assim, uma transação problemática (ou uma falha
+// transitória pontual) não derruba as demais transações do lote para "Outros".
+async function classifyBatch(
+    items: BatchTransactionInput[],
+    userCategoryNames: string[],
+): Promise<BatchTransactionResult[]> {
+    if (items.length === 0) return []
+
+    try {
+        return await attemptClassifyBatch(items, userCategoryNames)
+    } catch (error) {
+        const isRateLimited = error instanceof BatchClassificationError && error.isRateLimited
+
+        if (isRateLimited || items.length === 1) {
+            if (isRateLimited) {
+                console.error(
+                    `Cota do Gemini esgotada para lote de ${items.length} item(ns); aplicando classificação padrão (fallback).`,
+                    error,
+                )
+            } else {
+                console.error(
+                    `Falha ao classificar transação isolada ("${items[0]?.name}"); aplicando classificação padrão (fallback).`,
+                    error,
+                )
+            }
+            return items.map(() => fallback())
+        }
+
+        console.warn(
+            `Falha ao classificar lote de ${items.length} transações (${error instanceof Error ? error.message : error}); dividindo em sub-lotes menores para isolar o problema.`,
+        )
+
+        const mid = Math.ceil(items.length / 2)
+        const firstHalfResults = await classifyBatch(items.slice(0, mid), userCategoryNames)
+        const secondHalfResults = await classifyBatch(items.slice(mid), userCategoryNames)
+
+        return [...firstHalfResults, ...secondHalfResults]
+    }
 }
 
 export async function detectTransactionsBatchWithIA(
