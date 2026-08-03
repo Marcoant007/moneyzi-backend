@@ -5,12 +5,10 @@ import type { TransactionRepository } from '@/application/repositories/transacti
 import type { CreditCardRepository } from '@/core/repositories/credit-card-repository'
 import type { TransactionMessage } from '@/core/types/transaction-message'
 
-// ── Mock logger ───────────────────────────────────────────────────────────────
 vi.mock('@/lib/logger', () => ({
     default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function makeCard(overrides: Partial<{
     id: string
     userId: string
@@ -57,11 +55,9 @@ function makeTx(overrides: Partial<TransactionMessage> = {}): TransactionMessage
     }
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
 describe('PersistTransactionHandler — dueDate em importação de fatura', () => {
 
     it('usa o mês seguinte ao anchorDate quando isCreditCardInvoice=true (fatura Inter fev → mar)', async () => {
-        // Fatura de fevereiro: anchorDate = 28/02/2026, dueDay = 10 → deve gerar 10/03/2026
         const deps = makeDeps({ dueDay: 10, closingDay: 1 })
         const sut = new PersistTransactionHandler(
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
@@ -79,12 +75,11 @@ describe('PersistTransactionHandler — dueDate em importação de fatura', () =
         expect(saved.dueDate).toBeDefined()
         const due = saved.dueDate as Date
         expect(due.getFullYear()).toBe(2026)
-        expect(due.getMonth()).toBe(2)   // 0-indexed: março = 2
+        expect(due.getMonth()).toBe(2)
         expect(due.getDate()).toBe(10)
     })
 
     it('todas as transações da mesma fatura recebem o mesmo dueDate independente da date', async () => {
-        // Parcela antiga com date em ago/2025 mas importada na fatura de fev/2026
         const deps = makeDeps({ dueDay: 10, closingDay: 1 })
         const sut = new PersistTransactionHandler(
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
@@ -124,13 +119,11 @@ describe('PersistTransactionHandler — dueDate em importação de fatura', () =
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
         expect(due.getFullYear()).toBe(2026)
-        expect(due.getMonth()).toBe(0)   // janeiro
+        expect(due.getMonth()).toBe(0)
         expect(due.getDate()).toBe(10)
     })
 
     it('não usa closingDay no cálculo de fatura — closingDay=1 não pode mandar tudo para abril', async () => {
-        // BUG original: com closingDay=1, txDay(15) > closingDay(1) → +2 → Abril
-        // Correto: isCreditCardInvoice ignora closingDay → anchorDate → Março
         const deps = makeDeps({ dueDay: 10, closingDay: 1 })
         const sut = new PersistTransactionHandler(
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
@@ -146,9 +139,7 @@ describe('PersistTransactionHandler — dueDate em importação de fatura', () =
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        // NÃO pode ser Abril (mês 3)
         expect(due.getMonth()).not.toBe(3)
-        // Deve ser Março (mês 2)
         expect(due.getMonth()).toBe(2)
     })
 })
@@ -161,7 +152,6 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
         )
 
-        // Compra dia 15/fev (15 ≤ 28) → +1 → Março/10
         const tx = makeTx({
             date: new Date(2026, 1, 15, 12, 0, 0, 0),
             isCreditCardInvoice: false,
@@ -172,7 +162,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        expect(due.getMonth()).toBe(2)   // março
+        expect(due.getMonth()).toBe(2)
         expect(due.getDate()).toBe(10)
     })
 
@@ -182,9 +172,8 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
         )
 
-        // Compra dia 06/fev (6 > 5) → +2 → Abril/10
         const tx = makeTx({
-            date: new Date(2026, 1, 6, 12, 0, 0, 0),   // 06/feb local noon — avoids UTC-3 day shift
+            date: new Date(2026, 1, 6, 12, 0, 0, 0),
             isCreditCardInvoice: false,
             statementAnchorDate: undefined,
         })
@@ -193,7 +182,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        expect(due.getMonth()).toBe(3)   // abril
+        expect(due.getMonth()).toBe(3)
         expect(due.getDate()).toBe(10)
     })
 
@@ -203,7 +192,6 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
             deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
         )
 
-        // Compra dia 04/fev (4 ≤ 5) → +1 → Março/10
         const tx = makeTx({
             date: new Date(2026, 1, 4, 12, 0, 0, 0),
             isCreditCardInvoice: false,
@@ -214,7 +202,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        expect(due.getMonth()).toBe(2)   // março
+        expect(due.getMonth()).toBe(2)
         expect(due.getDate()).toBe(10)
     })
 
@@ -225,7 +213,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
         )
 
         const tx = makeTx({
-            date: new Date(2026, 1, 15, 12, 0, 0, 0),   // 15 > 10
+            date: new Date(2026, 1, 15, 12, 0, 0, 0),
             isCreditCardInvoice: false,
         })
 
@@ -233,7 +221,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        expect(due.getMonth()).toBe(2)   // março
+        expect(due.getMonth()).toBe(2)
         expect(due.getDate()).toBe(10)
     })
 
@@ -244,7 +232,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
         )
 
         const tx = makeTx({
-            date: new Date(2026, 1, 5, 12, 0, 0, 0),   // 5 <= 10
+            date: new Date(2026, 1, 5, 12, 0, 0, 0),
             isCreditCardInvoice: false,
         })
 
@@ -252,7 +240,7 @@ describe('PersistTransactionHandler — dueDate em transação manual de cartão
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        expect(due.getMonth()).toBe(1)   // fevereiro (mesmo mês)
+        expect(due.getMonth()).toBe(1)
         expect(due.getDate()).toBe(10)
     })
 })
@@ -274,7 +262,6 @@ describe('PersistTransactionHandler — dueDate fuso horário', () => {
 
         const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
         const due = saved.dueDate as Date
-        // Deve ser meio-dia (12:00) para não sofrer com UTC-3
         expect(due.getHours()).toBe(12)
     })
 

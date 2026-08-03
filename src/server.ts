@@ -5,6 +5,7 @@ import fastifyCors from '@fastify/cors'
 import { importRoutes } from '@routes/import.route'
 import { categoryRoutes } from '@routes/category.route'
 import { reportRoutes } from '@routes/report.routes'
+import { deepAnalysisRoutes } from '@routes/deep-analysis.routes'
 import { notificationRoutes } from '@routes/notification.route'
 import { cronRoutes } from '@routes/cron.route'
 import { userRoutes } from '@routes/user.route'
@@ -37,6 +38,7 @@ async function bootstrap() {
         protectedApp.register(importRoutes)
         protectedApp.register(categoryRoutes)
         protectedApp.register(reportRoutes)
+        protectedApp.register(deepAnalysisRoutes)
         protectedApp.register(notificationRoutes)
         protectedApp.register(creditCardRoutes)
         protectedApp.register(payablesRoutes)
