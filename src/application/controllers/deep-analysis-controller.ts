@@ -86,6 +86,7 @@ export class DeepAnalysisController {
             incomeStability: z.enum(['STABLE', 'VARIABLE']).optional(),
             reserveTargetOverride: z.number().min(0).nullable().optional(),
             reserveMonthlyContribution: z.number().min(0).nullable().optional(),
+            completeOnboarding: z.boolean().optional(),
         })
 
         try {

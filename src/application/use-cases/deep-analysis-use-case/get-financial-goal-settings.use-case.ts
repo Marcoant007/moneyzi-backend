@@ -5,6 +5,7 @@ export type FinancialGoalSettingsOutput = {
     incomeStability: IncomeStability
     reserveTargetOverride: number | null
     reserveMonthlyContribution: number | null
+    onboardingCompletedAt: string | null
 }
 
 export class GetFinancialGoalSettingsUseCase {
@@ -19,6 +20,7 @@ export class GetFinancialGoalSettingsUseCase {
             reserveMonthlyContribution: settings?.reserveMonthlyContribution
                 ? Number(settings.reserveMonthlyContribution)
                 : null,
+            onboardingCompletedAt: settings?.onboardingCompletedAt ? settings.onboardingCompletedAt.toISOString() : null,
         }
     }
 }

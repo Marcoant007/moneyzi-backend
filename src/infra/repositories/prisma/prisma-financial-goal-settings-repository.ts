@@ -13,7 +13,8 @@ export class PrismaFinancialGoalSettingsRepository implements FinancialGoalSetti
     }
 
     async upsert(data: UpsertFinancialGoalSettingsData): Promise<FinancialGoalSettings> {
-        const { userId, incomeStability, reserveTargetOverride, reserveMonthlyContribution } = data
+        const { userId, incomeStability, reserveTargetOverride, reserveMonthlyContribution, completeOnboarding } = data
+        const onboardingCompletedAt = completeOnboarding ? new Date() : undefined
 
         return prisma.financialGoalSettings.upsert({
             where: { userId },
@@ -22,11 +23,13 @@ export class PrismaFinancialGoalSettingsRepository implements FinancialGoalSetti
                 incomeStability: incomeStability ?? 'STABLE',
                 reserveTargetOverride: reserveTargetOverride ?? null,
                 reserveMonthlyContribution: reserveMonthlyContribution ?? null,
+                onboardingCompletedAt,
             },
             update: {
                 ...(incomeStability !== undefined ? { incomeStability } : {}),
                 ...(reserveTargetOverride !== undefined ? { reserveTargetOverride } : {}),
                 ...(reserveMonthlyContribution !== undefined ? { reserveMonthlyContribution } : {}),
+                ...(onboardingCompletedAt !== undefined ? { onboardingCompletedAt } : {}),
             },
         })
     }

@@ -5,6 +5,7 @@ export interface UpsertFinancialGoalSettingsData {
     incomeStability?: IncomeStability
     reserveTargetOverride?: number | null
     reserveMonthlyContribution?: number | null
+    completeOnboarding?: boolean
 }
 
 export interface FinancialGoalSettingsRepository {

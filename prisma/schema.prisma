@@ -298,6 +298,7 @@ model FinancialGoalSettings {
   incomeStability              IncomeStability @default(STABLE)
   reserveTargetOverride        Decimal?        @db.Decimal(10, 2)
   reserveMonthlyContribution   Decimal?        @db.Decimal(10, 2)
+  onboardingCompletedAt        DateTime?
   createdAt                    DateTime        @default(now())
   updatedAt                    DateTime        @updatedAt
 }
