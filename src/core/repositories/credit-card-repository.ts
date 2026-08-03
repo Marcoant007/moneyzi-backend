@@ -8,6 +8,7 @@ export interface CreateCreditCardData {
   closingDay?: number;
   dueDay?: number;
   color?: string;
+  bank?: string | null;
   userId: string;
 }
 
@@ -19,6 +20,7 @@ export interface UpdateCreditCardData {
   closingDay?: number;
   dueDay?: number;
   color?: string;
+  bank?: string | null;
   isActive?: boolean;
 }
 

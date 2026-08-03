@@ -5,11 +5,12 @@ import { CreditCardRepository } from '@/core/repositories/credit-card-repository
 const updateCreditCardSchema = z.object({
   name: z.string().min(1).optional(),
   lastFourDigits: z.string().length(4).optional(),
-  brand: z.enum(['VISA', 'MASTERCARD', 'ELO', 'AMEX', 'HIPERCARD', 'OTHER']).optional(),
+  brand: z.enum(['VISA', 'MASTERCARD', 'ELO', 'AMEX', 'HIPERCARD', 'DINERS', 'DISCOVER', 'OTHER']).optional(),
   limit: z.number().positive().optional(),
   closingDay: z.number().min(1).max(31).optional(),
   dueDay: z.number().min(1).max(31).optional(),
   color: z.string().optional(),
+  bank: z.string().nullable().optional(),
   isActive: z.boolean().optional()
 });
 

@@ -169,7 +169,8 @@ model CreditCard {
   limit          Decimal?      @db.Decimal(10, 2)
   closingDay     Int?          
   dueDay         Int?          
-  color          String        @default("#3b82f6") 
+  color          String        @default("#3b82f6")
+  bank           String?
   isActive       Boolean       @default(true)
   userId         String
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -235,6 +236,8 @@ enum CardBrand {
   ELO
   AMEX
   HIPERCARD
+  DINERS
+  DISCOVER
   OTHER
 }
 
