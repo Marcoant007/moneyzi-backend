@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { GetDashboardReportUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard-report.use-case'
 import { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-case/get-monthly-summary.use-case'
 import { GetAiInsightsUseCase } from '@/application/use-cases/dashboard-use-case/get-ai-insights.use-case'
+import { normalizeLocale } from '@/core/types/locale'
 import { format } from 'date-fns'
 
 export class ReportController {
@@ -95,7 +96,8 @@ export class ReportController {
 
         try {
             const { isPro, context } = bodySchema.parse(request.body)
-            const result = await this.getAiInsightsUseCase.execute(userId, isPro, context)
+            const locale = normalizeLocale(request.headers['x-locale'])
+            const result = await this.getAiInsightsUseCase.execute(userId, isPro, context, locale)
             return reply.send(result)
         } catch (error: any) {
             if (error.message?.startsWith('RATE_LIMIT:')) {

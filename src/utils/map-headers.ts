@@ -29,11 +29,16 @@ export function mapHeaders(
             result[original] = 'amount'
         } else if (key.includes('data') || key.includes('date')) {
             result[original] = 'date'
-        } else if (key.includes('categoria')) {
+        } else if (key.includes('categoria') || key.includes('category')) {
             result[original] = 'category'
-        } else if (key.includes('tipo')) {
+        } else if (key.includes('tipo') || key.includes('type')) {
             result[original] = 'type'
-        } else if (key.includes('pagamento') || key.includes('metodo')) {
+        } else if (
+            key.includes('pagamento') ||
+            key.includes('metodo') ||
+            key.includes('payment') ||
+            key.includes('method')
+        ) {
             result[original] = 'paymentMethod'
         }
     }

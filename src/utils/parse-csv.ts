@@ -2,8 +2,12 @@ import { ParsedTransaction } from '@/core/dtos/parsed-transaction.dto'
 import { parse } from 'csv-parse/sync'
 import { mapHeaders } from './map-headers'
 import { parseCsvRow } from './parse-csv-row'
+import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 
-export function parseCsv(buffer: Buffer): Partial<ParsedTransaction>[] {
+export function parseCsv(
+    buffer: Buffer,
+    region: CsvRegion = DEFAULT_CSV_REGION
+): Partial<ParsedTransaction>[] {
     const content = buffer.toString('utf-8').replace(/^\uFEFF/, '')
 
     const rawRecords = parse(content, {
@@ -17,5 +21,5 @@ export function parseCsv(buffer: Buffer): Partial<ParsedTransaction>[] {
 
     const headerMap = mapHeaders(Object.keys(rawRecords[0]))
 
-    return rawRecords.map((raw) => parseCsvRow(raw, headerMap))
+    return rawRecords.map((raw) => parseCsvRow(raw, headerMap, region))
 }

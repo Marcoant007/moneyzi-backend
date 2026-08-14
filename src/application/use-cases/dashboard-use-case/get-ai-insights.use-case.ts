@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { redis } from '@/infra/cache/redis'
 import { format } from 'date-fns'
+import type { AppLocale } from '@/core/types/locale'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -40,6 +41,7 @@ export class GetAiInsightsUseCase {
         userId: string,
         isPro: boolean,
         context: AiInsightContext,
+        locale: AppLocale = 'pt',
     ): Promise<{ insights: string[]; remaining: number }> {
         const limit = isPro ? DAILY_LIMIT_PRO : DAILY_LIMIT_FREE
         const todayKey = `ai:insights:${userId}:${format(new Date(), 'yyyy-MM-dd')}`
@@ -65,13 +67,18 @@ export class GetAiInsightsUseCase {
         const remaining = Math.max(0, limit - current)
 
         const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' })
-        const result = await model.generateContent(this.buildPrompt(context))
+        const result = await model.generateContent(this.buildPrompt(context, locale))
         const text = result.response.text()
 
         return { insights: this.parseInsights(text), remaining }
     }
 
-    private buildPrompt(ctx: AiInsightContext): string {
+    private buildPrompt(ctx: AiInsightContext, locale: AppLocale): string {
+        if (locale === 'en') return this.buildPromptEn(ctx)
+        return this.buildPromptPt(ctx)
+    }
+
+    private buildPromptPt(ctx: AiInsightContext): string {
         const topOffenders = ctx.topOffenders
             .slice(0, 3)
             .map((o) => `${o.category} R$${o.total.toFixed(2)} (${o.incomePercent.toFixed(1)}% renda)`)
@@ -100,6 +107,38 @@ Top gastos: ${topOffenders || 'nenhum'}
 50/30/20 — Essenciais: ${ctx.rule503020.needs.actualPercent.toFixed(1)}% | Estilo de vida: ${ctx.rule503020.wants.actualPercent.toFixed(1)}% | Futuro: ${ctx.rule503020.future.actualPercent.toFixed(1)}% (R$${ctx.rule503020.future.total.toFixed(2)})
 
 Responda APENAS com os 4 insights, um por linha, sem numeração, sem bullets, sem saudação.`
+    }
+
+    private buildPromptEn(ctx: AiInsightContext): string {
+        const topOffenders = ctx.topOffenders
+            .slice(0, 3)
+            .map((o) => `${o.category} R$${o.total.toFixed(2)} (${o.incomePercent.toFixed(1)}% of income)`)
+            .join(' | ')
+
+        const creditInfo = ctx.creditCardAnalysis.total > 0
+            ? `Card: R$${ctx.creditCardAnalysis.total.toFixed(2)} (${ctx.creditCardAnalysis.expensePercent.toFixed(1)}% of expenses)${ctx.creditCardAnalysis.isDominant ? ' — dominant' : ''}${ctx.creditCardAnalysis.topCategory ? ` | Top: ${ctx.creditCardAnalysis.topCategory.name} R$${ctx.creditCardAnalysis.topCategory.total.toFixed(2)}` : ''}`
+            : 'No credit card usage.'
+
+        return `You are a Brazilian personal finance assistant. Analyze the monthly financial summary below and generate exactly 4 short insights (max 2 lines each), direct and actionable, written in English.
+
+Rules:
+- Mention real categories and amounts when relevant
+- Point out real problems and one concrete action for each
+- Vary the themes: variable spending, credit card, reserve/future, income commitment
+- Don't use generic phrases like "keep monitoring"
+- Tone: consultative, no drama
+- All monetary values are in Brazilian Reais (R$) — keep them in R$ exactly as given below, do not convert to another currency
+
+MONTH SUMMARY:
+Income: R$${ctx.income.toFixed(2)} | Expenses: R$${ctx.expenses.toFixed(2)} | Balance: R$${ctx.balance.toFixed(2)}
+Commitment: ${ctx.commitmentRate.toFixed(1)}%
+Fixed: R$${ctx.fixedExpenses.total.toFixed(2)} (${ctx.fixedExpenses.incomePercent.toFixed(1)}%)${ctx.variableExpenses.topCategory ? ` | Top fixed: ${ctx.variableExpenses.topCategory.category}` : ''}
+Variable: R$${ctx.variableExpenses.total.toFixed(2)} (${ctx.variableExpenses.incomePercent.toFixed(1)}%)${ctx.variableExpenses.topCategory ? ` | Top variable: ${ctx.variableExpenses.topCategory.category} R$${ctx.variableExpenses.topCategory.total.toFixed(2)}` : ''}
+${creditInfo}
+Top expenses: ${topOffenders || 'none'}
+50/30/20 — Essentials: ${ctx.rule503020.needs.actualPercent.toFixed(1)}% | Lifestyle: ${ctx.rule503020.wants.actualPercent.toFixed(1)}% | Future: ${ctx.rule503020.future.actualPercent.toFixed(1)}% (R$${ctx.rule503020.future.total.toFixed(2)})
+
+Respond with ONLY the 4 insights, one per line, no numbering, no bullets, no greeting.`
     }
 
     private parseInsights(text: string): string[] {

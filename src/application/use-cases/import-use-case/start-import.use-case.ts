@@ -2,6 +2,7 @@ import { ImportService } from '@/service/import-service'
 import { ImportJobDto } from '@/core/dtos/import-job.dto'
 import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
 import type { UserRepository } from '@/application/repositories/user-repository'
+import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 
 export class StartImportUseCase {
     constructor(
@@ -9,12 +10,14 @@ export class StartImportUseCase {
         private readonly importJobRepository: ImportJobRepository,
     ) { }
 
-    async execute(input: { 
-        userId: string; 
+    async execute(input: {
+        userId: string;
         fileBuffer: Buffer;
         creditCardId?: string;
         isCreditCardInvoice?: boolean;
+        region?: CsvRegion;
     }): Promise<{ job: ImportJobDto }> {
+        const region = input.region ?? DEFAULT_CSV_REGION
         const userId = input.userId.trim()
         if (!userId) {
             throw new Error('Usuário inválido')
@@ -29,7 +32,7 @@ export class StartImportUseCase {
         console.log('User found, parsing file buffer of size:', input.fileBuffer.length)
         let parsed: any[]
         try {
-            parsed = ImportService.parseOnly(input.fileBuffer)
+            parsed = ImportService.parseOnly(input.fileBuffer, region)
             console.log('File parsed successfully, found', parsed.length, 'transactions')
         } catch (error) {
             console.error('Error parsing file:', error)
@@ -60,6 +63,7 @@ export class StartImportUseCase {
                 job.id,
                 input.creditCardId,
                 input.isCreditCardInvoice,
+                region,
             )
             console.log('Import process started successfully')
         } catch (error) {

@@ -3,6 +3,7 @@ import { StartImportUseCase } from '@/application/use-cases/import-use-case/star
 import { GetImportJobStatusUseCase } from '@/application/use-cases/import-use-case/get-import-job-status.use-case'
 import { GetDashboardUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard.use-case'
 import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
+import { normalizeCsvRegion } from '@/core/types/csv-region'
 
 export class ImportController {
     constructor(
@@ -33,13 +34,15 @@ export class ImportController {
         const isCreditCardInvoiceRaw = this.readMultipartFieldValue(data.fields?.isCreditCardInvoice)
         const parsedInvoiceFlag = this.parseBooleanField(isCreditCardInvoiceRaw)
         const isCreditCardInvoice = parsedInvoiceFlag ?? Boolean(creditCardId)
+        const region = normalizeCsvRegion(this.readMultipartFieldValue(data.fields?.region))
 
         try {
             const { job } = await this.startImportUseCase.execute({
                 userId,
                 fileBuffer: buffer,
                 creditCardId,
-                isCreditCardInvoice
+                isCreditCardInvoice,
+                region,
             })
             return reply.status(202).send({ message: 'Arquivo sendo processado', job })
         } catch (error) {

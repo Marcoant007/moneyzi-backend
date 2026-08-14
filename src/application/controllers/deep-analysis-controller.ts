@@ -5,6 +5,7 @@ import { GetDeepAnalysisUseCase } from '@/application/use-cases/deep-analysis-us
 import { GenerateDeepAnalysisUseCase } from '@/application/use-cases/deep-analysis-use-case/generate-deep-analysis.use-case'
 import { GetFinancialGoalSettingsUseCase } from '@/application/use-cases/deep-analysis-use-case/get-financial-goal-settings.use-case'
 import { UpdateFinancialGoalSettingsUseCase } from '@/application/use-cases/deep-analysis-use-case/update-financial-goal-settings.use-case'
+import { normalizeLocale } from '@/core/types/locale'
 
 const periodSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
 
@@ -49,7 +50,8 @@ export class DeepAnalysisController {
         try {
             const { period, isPro } = bodySchema.parse(request.body)
             const selectedPeriod = period ?? format(new Date(), 'yyyy-MM')
-            const result = await this.generateDeepAnalysisUseCase.execute(userId, selectedPeriod, isPro)
+            const locale = normalizeLocale(request.headers['x-locale'])
+            const result = await this.generateDeepAnalysisUseCase.execute(userId, selectedPeriod, isPro, locale)
             return reply.send(result)
         } catch (error: any) {
             if (error.message?.startsWith('RATE_LIMIT:')) {

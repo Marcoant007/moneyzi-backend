@@ -76,4 +76,46 @@ describe('parseCsvRow', () => {
     expect(parsed.category).toBeUndefined()
     expect(parsed.categoryName).toBeUndefined()
   })
+
+  it('parses US-format amount and date (MM/DD/YYYY, "$" + comma thousands) when region is US', () => {
+    const row = {
+      Description: 'Grocery Store',
+      Amount: '$1,234.56',
+      Date: '03/15/2025', // March 15th in US format
+    }
+
+    const headerMap = {
+      Description: 'name',
+      Amount: 'amount',
+      Date: 'date',
+    } as Record<string, any>
+
+    const parsed = parseCsvRow(row, headerMap, 'US')
+
+    expect(parsed.name).toBe('Grocery Store')
+    expect(parsed.amount).toBeCloseTo(1234.56)
+    expect(parsed.date).toBeInstanceOf(Date)
+    expect((parsed.date as Date).getUTCMonth()).toBe(2) // March = index 2
+    expect((parsed.date as Date).getUTCDate()).toBe(15)
+  })
+
+  it('still parses BR-format when region is BR (default), even with a day > 12', () => {
+    const row = {
+      Descricao: 'Compra',
+      Valor: 'R$ 1.234,56',
+      Data: '15/03/2025', // 15 de março em formato BR
+    }
+
+    const headerMap = {
+      Descricao: 'name',
+      Valor: 'amount',
+      Data: 'date',
+    } as Record<string, any>
+
+    const parsed = parseCsvRow(row, headerMap, 'BR')
+
+    expect(parsed.amount).toBeCloseTo(1234.56)
+    expect((parsed.date as Date).getUTCMonth()).toBe(2) // março = index 2
+    expect((parsed.date as Date).getUTCDate()).toBe(15)
+  })
 })

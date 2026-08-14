@@ -127,4 +127,62 @@ describe('ImportController', () => {
             }),
         )
     })
+
+    it('reads region=US from multipart fields and passes it through', async () => {
+        const request = makeRequest({
+            region: { value: 'US' },
+        })
+        const reply = makeReply()
+
+        await controller.importCsv(request, reply)
+
+        expect(startImportUseCase.execute).toHaveBeenCalledWith(
+            expect.objectContaining({
+                region: 'US',
+            }),
+        )
+    })
+
+    it('reads a plain string region field (not the { value } wrapper)', async () => {
+        const request = makeRequest({
+            region: 'US',
+        })
+        const reply = makeReply()
+
+        await controller.importCsv(request, reply)
+
+        expect(startImportUseCase.execute).toHaveBeenCalledWith(
+            expect.objectContaining({
+                region: 'US',
+            }),
+        )
+    })
+
+    it('defaults region to BR when the field is missing', async () => {
+        const request = makeRequest({})
+        const reply = makeReply()
+
+        await controller.importCsv(request, reply)
+
+        expect(startImportUseCase.execute).toHaveBeenCalledWith(
+            expect.objectContaining({
+                region: 'BR',
+            }),
+        )
+    })
+
+    it('defaults region to BR when an unrecognized value is sent', async () => {
+        const request = makeRequest({
+            region: { value: 'XX' },
+        })
+        const reply = makeReply()
+
+        await controller.importCsv(request, reply)
+
+        expect(startImportUseCase.execute).toHaveBeenCalledWith(
+            expect.objectContaining({
+                region: 'BR',
+            }),
+        )
+    })
 })

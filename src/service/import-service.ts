@@ -6,6 +6,7 @@ import { detectTransactionsBatchWithIA } from '@/core/gemini/detect-transactions
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import logger from '@/lib/logger'
+import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 
 const categoryRepository: CategoryRepository = new PrismaCategoryRepository()
 
@@ -17,10 +18,10 @@ export class ImportService {
         return 'unknown'
     }
 
-    static parseOnly(buffer: Buffer): Partial<any>[] {
+    static parseOnly(buffer: Buffer, region: CsvRegion = DEFAULT_CSV_REGION): Partial<any>[] {
         const type = this.detectType(buffer)
 
-        if (type === 'csv') return parseCsv(buffer)
+        if (type === 'csv') return parseCsv(buffer, region)
         if (type === 'ofx') return OfxParser.parse(buffer)
 
         throw new Error('Tipo de arquivo nao suportado')
@@ -32,13 +33,14 @@ export class ImportService {
         jobId?: string,
         creditCardId?: string,
         isCreditCardInvoice?: boolean,
+        region: CsvRegion = DEFAULT_CSV_REGION,
     ) {
         const type = this.detectType(buffer)
 
         let parsed: Partial<any>[] = []
 
         if (type === 'csv') {
-            parsed = parseCsv(buffer)
+            parsed = parseCsv(buffer, region)
         } else if (type === 'ofx') {
             parsed = OfxParser.parse(buffer)
         } else {
