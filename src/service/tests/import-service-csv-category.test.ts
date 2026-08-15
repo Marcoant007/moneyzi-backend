@@ -77,6 +77,30 @@ describe('ImportService — CSV category takes precedence over AI', () => {
         expect(categoryRepoMocks.create).not.toHaveBeenCalled()
     })
 
+    it('only matches/caches top-level categories by name, ignoring a subcategory with the same name', async () => {
+        const { ImportService } = await import('../import-service')
+        const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
+        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
+
+        categoryRepoMocks.listByUserId.mockResolvedValue([
+            { id: 'sub-alimentacao', name: 'Alimentação', userId: 'user-1', parentId: 'some-parent' },
+            { id: 'top-alimentacao', name: 'Alimentação', userId: 'user-1', parentId: null },
+        ])
+        ;(detectTransactionsBatchWithIA as any).mockResolvedValue([
+            { type: 'EXPENSE', category: 'OTHER', paymentMethod: 'CREDIT_CARD' },
+        ])
+
+        const csv = Buffer.from(
+            'Descrição,Valor,Data,Categoria\n"Compra Supermercado","R$ 50,00","01/02/2025","Supermercado"',
+        )
+
+        await ImportService.import(csv, 'user-1', 'job-1')
+
+        const message = (publishToQueue as any).mock.calls[0][0]
+        expect(message.categoryId).toBe('top-alimentacao')
+        expect(categoryRepoMocks.create).not.toHaveBeenCalled()
+    })
+
     it('falls back to the AI classification when the CSV category is not recognized', async () => {
         const { ImportService } = await import('../import-service')
         const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')

@@ -19,6 +19,11 @@ export class DeleteCategoryUseCase {
             throw new Error('Unauthorized')
         }
 
+        const hasChildren = await this.categoryRepository.hasChildren(id)
+        if (hasChildren) {
+            throw new Error('Category has children')
+        }
+
         const hasTransactions = await this.categoryRepository.hasTransactions(id)
         if (hasTransactions) {
             throw new Error('Category has transactions')

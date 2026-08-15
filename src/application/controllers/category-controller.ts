@@ -17,10 +17,11 @@ export class CategoryController {
 
     async create(request: FastifyRequest, reply: FastifyReply) {
         const createCategorySchema = z.object({
-            name: z.string().min(1)
+            name: z.string().min(1),
+            parentId: z.string().uuid().nullable().optional(),
         })
 
-        const { name } = createCategorySchema.parse(request.body)
+        const { name, parentId } = createCategorySchema.parse(request.body)
         const userId = request.headers['x-user-id'] as string
 
         if (!userId) {
@@ -28,7 +29,7 @@ export class CategoryController {
         }
 
         try {
-            const category = await this.createCategoryUseCase.execute({ name, userId })
+            const category = await this.createCategoryUseCase.execute({ name, userId, parentId })
             return reply.status(201).send(category)
         } catch (error: any) {
             return reply.status(400).send({ error: error.message })
@@ -74,14 +75,15 @@ export class CategoryController {
 
     async update(request: FastifyRequest, reply: FastifyReply) {
         const updateCategorySchema = z.object({
-            name: z.string().min(1)
+            name: z.string().min(1),
+            parentId: z.string().uuid().nullable().optional(),
         })
 
         const paramsSchema = z.object({
             id: z.string().uuid()
         })
 
-        const { name } = updateCategorySchema.parse(request.body)
+        const { name, parentId } = updateCategorySchema.parse(request.body)
         const { id } = paramsSchema.parse(request.params)
         const userId = request.headers['x-user-id'] as string
 
@@ -90,7 +92,7 @@ export class CategoryController {
         }
 
         try {
-            const category = await this.updateCategoryUseCase.execute({ id, userId, name })
+            const category = await this.updateCategoryUseCase.execute({ id, userId, name, parentId })
             return reply.send(category)
         } catch (error: any) {
             if (error.message === 'Unauthorized') {
@@ -124,6 +126,9 @@ export class CategoryController {
             }
             if (error.message === 'Category not found') {
                 return reply.status(404).send({ error: error.message })
+            }
+            if (error.message === 'Category has children') {
+                return reply.status(400).send({ error: 'Não é possível excluir uma categoria que possui subcategorias vinculadas. Exclua ou mova as subcategorias primeiro.' })
             }
             if (error.message === 'Category has transactions') {
                 return reply.status(400).send({ error: 'Não é possível excluir uma categoria que possui transações vinculadas.' })

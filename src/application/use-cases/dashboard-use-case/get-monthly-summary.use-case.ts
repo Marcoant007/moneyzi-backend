@@ -1,6 +1,7 @@
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { MoneyUtils } from '@/utils/money.utils'
+import { buildTopLevelCategoryNameMap } from '@/utils/category-hierarchy'
 import type { Prisma, TransactionCategory } from '@prisma/client'
 
 type DashboardTransaction = Prisma.TransactionGetPayload<{ include: { creditCard: true } }>
@@ -150,7 +151,7 @@ export class GetMonthlySummaryUseCase {
             this.categoryRepository.listByUserId(userId),
         ])
 
-        const categoryNameById = new Map(userCategories.map((category) => [category.id, category.name]))
+        const categoryNameById = buildTopLevelCategoryNameMap(userCategories)
         const income = this.computeIncome(transactions)
         const expenseEntries = this.buildExpenseEntries(transactions, categoryNameById)
 

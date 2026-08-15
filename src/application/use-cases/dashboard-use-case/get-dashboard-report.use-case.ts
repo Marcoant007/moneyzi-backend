@@ -2,6 +2,7 @@ import { TransactionRepository } from '@/application/repositories/transaction-re
 import { CategoryRepository } from '@/application/repositories/category-repository'
 import { startOfMonth, addMonths, endOfMonth, format } from 'date-fns'
 import { TransactionType } from '@prisma/client'
+import { buildTopLevelCategoryNameMap } from '@/utils/category-hierarchy'
 
 export interface DashboardReportOutput {
     forecast: Array<{
@@ -93,7 +94,7 @@ export class GetDashboardReportUseCase {
             UTILITY: "Utilidades",
         };
 
-        const categoryMap = new Map(userCategories.map(c => [c.id, c.name]))
+        const categoryMap = buildTopLevelCategoryNameMap(userCategories)
         const categoriesDataMap = new Map<string, number>()
 
         categoryStats.forEach(stat => {

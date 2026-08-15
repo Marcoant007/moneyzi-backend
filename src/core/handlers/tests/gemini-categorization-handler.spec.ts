@@ -179,4 +179,26 @@ describe('GeminiCategorizationHandler', () => {
         await sut.handle(tx)
         expect(mocks.detectTransactionDataWithIA).not.toHaveBeenCalled()
     })
+
+    it('casa o nome sugerido pela IA só com categorias de topo, ignorando uma subcategoria com o mesmo nome', async () => {
+        repo = makeRepo({
+            listByUserId: vi.fn().mockResolvedValue([
+                { id: 'top-supermercado', name: 'Supermercado', parentId: null },
+                { id: 'sub-supermercado', name: 'Supermercado', parentId: 'some-other-parent' },
+            ]),
+        })
+        sut = new GeminiCategorizationHandler(repo)
+        mocks.detectTransactionDataWithIA.mockResolvedValue({
+            type: 'EXPENSE',
+            category: 'FOOD',
+            paymentMethod: 'CREDIT_CARD',
+            categoryId: undefined,
+            categoryName: 'Supermercado',
+        })
+
+        const result = await sut.handle(makeTx())
+
+        expect(result.categoryId).toBe('top-supermercado')
+        expect(repo.create).not.toHaveBeenCalled()
+    })
 })

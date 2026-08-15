@@ -156,7 +156,11 @@ export class ImportService {
         }
 
         const existingCategories = await categoryRepository.listByUserId(userId)
+        // Só casa/cria no nível de topo: com subcategorias, nomes repetidos em
+        // ramos diferentes (ex: duas "Outros" distintas) tornariam esse cache
+        // ambíguo por nome, categorizando o CSV no ramo errado silenciosamente.
         for (const category of existingCategories) {
+            if (category.parentId) continue
             cache.set(category.name.toLowerCase(), category.id)
         }
 

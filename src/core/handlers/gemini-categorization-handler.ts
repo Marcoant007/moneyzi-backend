@@ -29,7 +29,12 @@ export class GeminiCategorizationHandler extends AbstractTransactionHandler {
         if (!transaction.categoryId && result.categoryName && transaction.userId) {
             try {
                 const categories = await this.categoryRepository.listByUserId(transaction.userId)
-                const existing = categories.find(c => c.name.toLowerCase() === result.categoryName!.toLowerCase())
+                // Só casa/cria no nível de topo: com subcategorias, um nome como
+                // "Outros" pode existir em vários ramos diferentes, e casar por
+                // nome sem escopo viraria ambíguo (categorizaria a transação no
+                // ramo errado, silenciosamente).
+                const topLevelCategories = categories.filter(c => !c.parentId)
+                const existing = topLevelCategories.find(c => c.name.toLowerCase() === result.categoryName!.toLowerCase())
 
                 if (existing) {
                     transaction.categoryId = existing.id

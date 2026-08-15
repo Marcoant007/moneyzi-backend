@@ -1,10 +1,12 @@
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
 import type { Category } from '@prisma/client'
+import { getCategoryDepth } from '@/utils/category-hierarchy'
 
 interface CategoryWithTransactionsDto {
     id: string
     name: string
+    parentId: string | null
     createdAt: Date
     totalSpend: number
     isVirtual?: boolean
@@ -64,6 +66,7 @@ export class ListCategoriesWithTransactionsUseCase {
                 return {
                     id: category.id,
                     name: category.name,
+                    parentId: category.parentId,
                     createdAt: category.createdAt,
                     totalSpend,
                     transactions: transactions.map(t => ({
@@ -76,6 +79,8 @@ export class ListCategoriesWithTransactionsUseCase {
                 }
             })
         )
+
+        this.rollupIntoAncestors(categoriesWithTransactions)
 
         // Also fetch transactions that have no custom categoryId, grouped by enum category
         const enumResults = await Promise.all(
@@ -96,6 +101,7 @@ export class ListCategoriesWithTransactionsUseCase {
             categoriesWithTransactions.push({
                 id: `enum:${enumCat}`,
                 name: ENUM_CATEGORY_LABEL[enumCat],
+                parentId: null,
                 createdAt: new Date(0),
                 totalSpend,
                 isVirtual: true,
@@ -113,5 +119,28 @@ export class ListCategoriesWithTransactionsUseCase {
         categoriesWithTransactions.sort((a, b) => b.totalSpend - a.totalSpend)
 
         return { categories: categoriesWithTransactions }
+    }
+
+    /**
+     * Soma o totalSpend e concatena as transações de cada categoria real na
+     * sua cadeia de ancestrais (subcategoria -> categoria -> ...), processando
+     * da folha pra raiz — assim uma categoria-mãe sempre reflete "própria +
+     * todas as descendentes", tanto no total quanto na lista de transações.
+     * Categorias virtuais (enum:*) nunca entram aqui — são adicionadas depois.
+     */
+    private rollupIntoAncestors(categories: CategoryWithTransactionsDto[]): void {
+        const byId = new Map(categories.map(c => [c.id, c]))
+        const byDepthDesc = [...categories].sort(
+            (a, b) => getCategoryDepth(categories, b.id) - getCategoryDepth(categories, a.id)
+        )
+
+        for (const category of byDepthDesc) {
+            if (!category.parentId) continue
+            const parent = byId.get(category.parentId)
+            if (!parent) continue
+
+            parent.totalSpend += category.totalSpend
+            parent.transactions = parent.transactions.concat(category.transactions)
+        }
     }
 }

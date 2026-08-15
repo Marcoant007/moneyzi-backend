@@ -3,6 +3,7 @@ import type { CategoryRepository } from '@/application/repositories/category-rep
 import type { AccountRepository } from '@/application/repositories/account-repository'
 import type { Prisma, TransactionType } from '@prisma/client'
 import { MoneyUtils } from '@/utils/money.utils'
+import { buildTopLevelCategoryNameMap } from '@/utils/category-hierarchy'
 
 const TRANSACTION_CATEGORY_LABELS: Record<string, string> = {
     EDUCATION: 'Educacao',
@@ -116,7 +117,7 @@ export class GetDashboardUseCase {
             EXPENSE: transactionsTotal ? Math.round((expensesTotal / transactionsTotal) * 100) : 0,
         }
 
-        const categoryMap = new Map(userCategories.map(c => [c.id, c.name]))
+        const categoryMap = buildTopLevelCategoryNameMap(userCategories)
         const categoriesDataMap = new Map<string, number>()
         const categoryTransactionsMap = new Map<string, CategoryExpenseTransactionOutput[]>()
 

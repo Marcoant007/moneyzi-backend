@@ -1,6 +1,7 @@
 import { CategoryRepository } from '@/application/repositories/category-repository'
 import { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { Category } from '@prisma/client'
+import { rollupCategoryTotals } from '@/utils/category-hierarchy'
 
 export class ListCategoriesUseCase {
     constructor(
@@ -8,24 +9,27 @@ export class ListCategoriesUseCase {
         private transactionRepository: TransactionRepository
     ) { }
 
-    async execute(userId: string): Promise<Array<{ id: string; name: string; createdAt: Date; totalSpend: number }>> {
+    async execute(userId: string): Promise<Array<{ id: string; name: string; parentId: string | null; createdAt: Date; totalSpend: number }>> {
         const categories = await this.categoryRepository.listByUserId(userId)
 
         const spendStats = await this.transactionRepository.groupExpensesByCategoryId(userId)
 
-        const spendMap = new Map<string, number>()
+        const directSpendMap = new Map<string, number>()
         for (const stat of spendStats) {
             if (stat.categoryId && stat._sum.amount) {
-                const current = spendMap.get(stat.categoryId) || 0
-                spendMap.set(stat.categoryId, current + Number(stat._sum.amount))
+                const current = directSpendMap.get(stat.categoryId) || 0
+                directSpendMap.set(stat.categoryId, current + Number(stat._sum.amount))
             }
         }
+
+        const rolledUpSpendMap = rollupCategoryTotals(categories, directSpendMap)
 
         return categories.map(category => ({
             id: category.id,
             name: category.name,
+            parentId: category.parentId,
             createdAt: category.createdAt,
-            totalSpend: spendMap.get(category.id) || 0
+            totalSpend: rolledUpSpendMap.get(category.id) || 0
         }))
     }
 }

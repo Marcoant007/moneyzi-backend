@@ -35,10 +35,11 @@ export class PrismaCategoryRepository implements CategoryRepository {
         })
     }
 
-    async existsByName(userId: string, name: string): Promise<boolean> {
+    async existsByName(userId: string, name: string, parentId: string | null): Promise<boolean> {
         const category = await prisma.category.findFirst({
             where: {
                 userId,
+                parentId,
                 name: {
                     equals: name,
                     mode: 'insensitive'
@@ -52,6 +53,26 @@ export class PrismaCategoryRepository implements CategoryRepository {
         const count = await prisma.transaction.count({
             where: {
                 categoryId: id
+            }
+        })
+        return count > 0
+    }
+
+    async hasChildren(id: string): Promise<boolean> {
+        const count = await prisma.category.count({
+            where: {
+                parentId: id
+            }
+        })
+        return count > 0
+    }
+
+    async hasGrandchildren(id: string): Promise<boolean> {
+        const count = await prisma.category.count({
+            where: {
+                parent: {
+                    parentId: id
+                }
             }
         })
         return count > 0
