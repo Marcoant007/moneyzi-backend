@@ -27,4 +27,13 @@ describe('mapHeaders', () => {
     expect(mapped['Payment Method']).toBe('paymentMethod')
     expect(mapped['Other']).toBeUndefined()
   })
+
+  it('maps a Nubank credit card export header set to ParsedTransaction keys', () => {
+    const headers = ['date', 'title', 'amount']
+    const mapped = mapHeaders(headers)
+
+    expect(mapped['date']).toBe('date')
+    expect(mapped['title']).toBe('name')
+    expect(mapped['amount']).toBe('amount')
+  })
 })

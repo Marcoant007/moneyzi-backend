@@ -21,6 +21,7 @@ export function mapHeaders(
             key.includes('nome') ||
             key.includes('name') ||
             key.includes('titulo') ||
+            key.includes('title') ||
             key.includes('lanc') ||
             key.includes('lancamento')
         ) {
