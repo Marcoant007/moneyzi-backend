@@ -76,6 +76,13 @@ export interface TransactionRepository {
     groupTotalsByType(userId?: string, range?: { start: Date; end: Date }): Promise<Array<{ type: TransactionType; _sum: { amount: Decimal | null } }>>
     groupExpensesByCategory(userId?: string, range?: { start: Date; end: Date }): Promise<Array<{ category: TransactionCategory; categoryId: string | null; _sum: { amount: Decimal | null } }>>
     groupExpensesByCategoryId(userId: string, range?: { start: Date; end: Date }): Promise<Array<{ categoryId: string | null; category: TransactionCategory; _sum: { amount: Decimal | null } }>>
+    /**
+     * Como groupExpensesByCategoryId, mas sem filtro de type — agrupa por
+     * categoria E tipo simultaneamente, para alimentar a matriz categoria×mês
+     * (Receitas usa DEPOSIT+INVESTMENT, Despesas usa EXPENSE). Compra de
+     * cartão conta no mês da fatura (dueDate), igual findMany já faz.
+     */
+    groupTransactionsByCategoryId(userId: string, range?: { start: Date; end: Date }): Promise<Array<{ categoryId: string | null; category: TransactionCategory; type: TransactionType; _sum: { amount: Decimal | null } }>>
     groupExpensesByRecurrence(userId: string, range?: { start: Date; end: Date }): Promise<Array<{ isRecurring: boolean; _sum: { amount: Decimal | null } }>>
     findLastTransactions(userId?: string, take?: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     aggregateMonthlyAmount(range: { start: Date; end: Date; userId?: string }): Promise<{ _sum: { amount: Decimal | null } }>

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { GetDashboardReportUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard-report.use-case'
 import { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-case/get-monthly-summary.use-case'
 import { GetAiInsightsUseCase } from '@/application/use-cases/dashboard-use-case/get-ai-insights.use-case'
+import { GetCategoryMonthMatrixUseCase } from '@/application/use-cases/dashboard-use-case/get-category-month-matrix.use-case'
 import { normalizeLocale } from '@/core/types/locale'
 import { format } from 'date-fns'
 
@@ -11,7 +12,32 @@ export class ReportController {
         private getDashboardReportUseCase: GetDashboardReportUseCase,
         private getMonthlySummaryUseCase: GetMonthlySummaryUseCase,
         private getAiInsightsUseCase: GetAiInsightsUseCase,
+        private getCategoryMonthMatrixUseCase: GetCategoryMonthMatrixUseCase,
     ) { }
+
+    async getCategoryMonthMatrix(request: FastifyRequest, reply: FastifyReply) {
+        const userId = request.headers['x-user-id'] as string
+
+        if (!userId) {
+            return reply.status(401).send({ error: 'Unauthorized' })
+        }
+
+        const querySchema = z.object({
+            year: z.coerce.number().int().min(2000).max(2100).optional()
+        })
+
+        try {
+            const { year } = querySchema.parse(request.query)
+            const report = await this.getCategoryMonthMatrixUseCase.execute({
+                userId,
+                year: year ?? new Date().getFullYear(),
+            })
+            return reply.send(report)
+        } catch (error: any) {
+            console.error(error)
+            return reply.status(400).send({ error: error.message || 'Failed to generate category-month matrix' })
+        }
+    }
 
     async getDashboard(request: FastifyRequest, reply: FastifyReply) {
         const userId = request.headers['x-user-id'] as string

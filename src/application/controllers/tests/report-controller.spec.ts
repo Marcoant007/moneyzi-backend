@@ -24,10 +24,15 @@ describe('ReportController', () => {
         execute: vi.fn(),
     } as any
 
+    const getCategoryMonthMatrixUseCase = {
+        execute: vi.fn(),
+    } as any
+
     const controller = new ReportController(
         getDashboardReportUseCase,
         getMonthlySummaryUseCase,
         getAiInsightsUseCase,
+        getCategoryMonthMatrixUseCase,
     )
 
     beforeEach(() => {
