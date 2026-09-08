@@ -1,4 +1,4 @@
-import type { PaymentStatus } from '@prisma/client'
+import type { PaymentStatus, TransactionType, TransactionPaymentMethod } from '@prisma/client'
 import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
 import { MoneyUtils } from '@/utils/money.utils'
 
@@ -15,6 +15,13 @@ export interface TransactionItem {
     paidAt: Date | null
     isRecurring: boolean
     category: string
+    // Campos extras para agrupamento por categoria-pai e edição completa no
+    // frontend (a tela /payables reaproveita o formulário de transação).
+    categoryId: string | null
+    type: TransactionType
+    date: Date
+    paymentMethod: TransactionPaymentMethod
+    accountId: string | null
 }
 
 export interface CardStatementItem {
@@ -149,6 +156,10 @@ export class GetPayablesReceivablesUseCase {
             paidAt: Date | null
             isRecurring: boolean
             category: string
+            categoryId: string | null
+            type: TransactionType
+            paymentMethod: TransactionPaymentMethod
+            accountId: string | null
         },
         today: Date
     ): TransactionItem {
@@ -165,6 +176,11 @@ export class GetPayablesReceivablesUseCase {
             paidAt: transaction.paidAt,
             isRecurring: transaction.isRecurring,
             category: transaction.category,
+            categoryId: transaction.categoryId,
+            type: transaction.type,
+            date: transaction.date,
+            paymentMethod: transaction.paymentMethod,
+            accountId: transaction.accountId,
         }
     }
 

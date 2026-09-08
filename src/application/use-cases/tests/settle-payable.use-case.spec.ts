@@ -249,4 +249,90 @@ describe('SettlePayableUseCase', () => {
             }),
         ).rejects.toThrow('No transactions found to settle')
     })
+
+    describe('TRANSACTION_GROUP scope', () => {
+        const recurringTx = (id: string, name: string) => {
+            const dueDate = new Date(2026, 4, 8, 12, 0, 0, 0)
+            return {
+                id,
+                userId: 'user-1',
+                name,
+                description: null,
+                type: 'EXPENSE',
+                amount: '100.00',
+                category: 'HOUSING',
+                paymentMethod: 'PIX',
+                date: dueDate,
+                dueDate,
+                isRecurring: true,
+                recurrenceGroupId: null,
+                categoryId: null,
+                accountId: null,
+            }
+        }
+
+        it('pays every transaction resolved for the group', async () => {
+            mocks.findTransactions.mockResolvedValueOnce([{ id: 'tx-1' }, { id: 'tx-2' }])
+            mocks.findFirstTransaction
+                .mockResolvedValueOnce({ id: 'tx-1', isRecurring: false })
+                .mockResolvedValueOnce({ id: 'tx-2', isRecurring: false })
+
+            const result = await sut.execute({
+                userId: 'user-1',
+                mode: 'PAY',
+                scope: 'TRANSACTION_GROUP',
+                transactionIds: ['tx-1', 'tx-2'],
+            })
+
+            expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1', 'tx-2'])
+            expect(transactionRepository.markAsPending).not.toHaveBeenCalled()
+            expect(result).toEqual({ updatedCount: 2 })
+        })
+
+        it('creates the next occurrence for each recurring child on group pay', async () => {
+            mocks.findTransactions.mockResolvedValueOnce([{ id: 'tx-1' }, { id: 'tx-2' }])
+            mocks.findFirstTransaction
+                .mockResolvedValueOnce(recurringTx('tx-1', 'Gás'))
+                .mockResolvedValueOnce(recurringTx('tx-2', 'Água'))
+
+            await sut.execute({
+                userId: 'user-1',
+                mode: 'PAY',
+                scope: 'TRANSACTION_GROUP',
+                transactionIds: ['tx-1', 'tx-2'],
+            })
+
+            expect(transactionRepository.create).toHaveBeenCalledTimes(2)
+        })
+
+        it('reverts the whole group on UNPAY without creating occurrences', async () => {
+            mocks.findTransactions.mockResolvedValueOnce([
+                { id: 'tx-1' },
+                { id: 'tx-2' },
+                { id: 'tx-3' },
+            ])
+
+            const result = await sut.execute({
+                userId: 'user-1',
+                mode: 'UNPAY',
+                scope: 'TRANSACTION_GROUP',
+                transactionIds: ['tx-1', 'tx-2', 'tx-3'],
+            })
+
+            expect(transactionRepository.markAsPending).toHaveBeenCalledWith(['tx-1', 'tx-2', 'tx-3'])
+            expect(transactionRepository.markAsPaid).not.toHaveBeenCalled()
+            expect(transactionRepository.create).not.toHaveBeenCalled()
+            expect(result).toEqual({ updatedCount: 3 })
+        })
+
+        it('fails when TRANSACTION_GROUP scope has no transactionIds', async () => {
+            await expect(
+                sut.execute({
+                    userId: 'user-1',
+                    mode: 'PAY',
+                    scope: 'TRANSACTION_GROUP',
+                }),
+            ).rejects.toThrow('transactionIds is required for TRANSACTION_GROUP scope')
+        })
+    })
 })

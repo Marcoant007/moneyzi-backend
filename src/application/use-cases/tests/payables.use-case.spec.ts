@@ -15,6 +15,10 @@ function makeTx(overrides: Partial<{
     paidAt: Date | null
     isRecurring: boolean
     category: string
+    categoryId: string | null
+    type: string
+    paymentMethod: string
+    accountId: string | null
     creditCardId: string | null
     creditCard: { name: string; dueDay?: number | null; closingDay?: number | null } | null
     [key: string]: unknown
@@ -30,6 +34,10 @@ function makeTx(overrides: Partial<{
         paidAt: null,
         isRecurring: false,
         category: 'utility',
+        categoryId: null,
+        type: 'EXPENSE',
+        paymentMethod: 'PIX',
+        accountId: null,
         creditCardId: null,
         creditCard: null,
         ...overrides,

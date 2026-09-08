@@ -39,8 +39,9 @@ export class PayablesController {
             const userId = request.headers['x-user-id'] as string;
             const body = request.body as {
                 mode: 'PAY' | 'UNPAY';
-                scope: 'TRANSACTION' | 'CARD_STATEMENT';
+                scope: 'TRANSACTION' | 'TRANSACTION_GROUP' | 'CARD_STATEMENT';
                 transactionId?: string;
+                transactionIds?: string[];
                 card?: { creditCardId: string; dueDate: string };
             };
 

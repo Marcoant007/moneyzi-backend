@@ -2,13 +2,17 @@ import type { TransactionRepository } from '@/application/repositories/transacti
 import { prisma } from '@/lib/prisma'
 
 export type SettleMode = 'PAY' | 'UNPAY'
-export type SettleScope = 'TRANSACTION' | 'CARD_STATEMENT'
+export type SettleScope = 'TRANSACTION' | 'TRANSACTION_GROUP' | 'CARD_STATEMENT'
 
 export interface SettlePayableInput {
     userId: string
     mode: SettleMode
     scope: SettleScope
     transactionId?: string
+    // Escopo TRANSACTION_GROUP: quitação em lote de todas as contas de um grupo
+    // de categoria-pai (tela /payables). PAY recebe só as pendentes; UNPAY
+    // recebe todas as filhas do grupo naquele mês.
+    transactionIds?: string[]
     card?: {
         creditCardId: string
         dueDate: string // ISO string
@@ -28,8 +32,13 @@ export class SettlePayableUseCase {
         if (input.mode === 'PAY') {
             await this.transactionRepository.markAsPaid(ids)
 
-            if (input.scope === 'TRANSACTION' && ids.length === 1) {
-                await this.maybeCreateNextOccurrence(input.userId, ids[0])
+            // Contas avulsas (TRANSACTION) e grupos de categoria (TRANSACTION_GROUP)
+            // geram a próxima ocorrência das filhas recorrentes. maybeCreateNextOccurrence
+            // já se protege por isRecurring e por findRecurringNextOccurrence.
+            if (input.scope === 'TRANSACTION' || input.scope === 'TRANSACTION_GROUP') {
+                for (const id of ids) {
+                    await this.maybeCreateNextOccurrence(input.userId, id)
+                }
             }
         } else {
             await this.transactionRepository.markAsPending(ids)
@@ -111,6 +120,23 @@ export class SettlePayableUseCase {
             })
 
             return transaction ? [transaction.id] : []
+        }
+
+        if (input.scope === 'TRANSACTION_GROUP') {
+            if (!input.transactionIds || input.transactionIds.length === 0) {
+                throw new Error('transactionIds is required for TRANSACTION_GROUP scope')
+            }
+
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    id: { in: input.transactionIds },
+                    userId: input.userId,
+                    deletedAt: null,
+                },
+                select: { id: true },
+            })
+
+            return transactions.map((transaction) => transaction.id)
         }
 
         // CARD_STATEMENT scope: find all transactions for that card in the same dueDate month/year
