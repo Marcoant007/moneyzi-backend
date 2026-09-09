@@ -55,9 +55,12 @@ export class PersistTransactionHandler extends AbstractTransactionHandler {
 
         // Imported invoice transactions represent already-paid purchases.
         // Mark them as PAID so they appear in dashboard category breakdowns.
+        // paidAt = vencimento da fatura (não a data da compra): o gasto do cartão
+        // é competência do mês da fatura. Usar a data da compra jogava o gasto no
+        // mês errado do dashboard/análise (compra em ago, fatura vence em set).
         const isImportedInvoice = Boolean(transaction.isCreditCardInvoice && transaction.importJobId)
         const paymentStatus = isImportedInvoice ? 'PAID' : 'PENDING'
-        const paidAt = isImportedInvoice ? persistedAt : null
+        const paidAt = isImportedInvoice ? (computedDueDate ?? persistedAt) : null
 
         const payload: Prisma.TransactionUncheckedCreateInput = {
             userId: transaction.userId,

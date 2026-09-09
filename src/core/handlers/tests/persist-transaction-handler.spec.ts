@@ -55,6 +55,43 @@ function makeTx(overrides: Partial<TransactionMessage> = {}): TransactionMessage
     }
 }
 
+describe('PersistTransactionHandler — paidAt da fatura importada', () => {
+    it('fatura importada: paidAt = vencimento da fatura, não a data da compra', async () => {
+        const deps = makeDeps({ dueDay: 10, closingDay: 1 })
+        const sut = new PersistTransactionHandler(
+            deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
+        )
+
+        const tx = makeTx({
+            date: new Date('2026-08-28'), // compra em agosto
+            importJobId: 'job-1',
+            isCreditCardInvoice: true,
+            statementAnchorDate: new Date('2026-08-31'), // fatura vence em setembro
+        })
+
+        await sut.handle(tx)
+
+        const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
+        expect(saved.paymentStatus).toBe('PAID')
+        const paidAt = saved.paidAt as Date
+        expect(paidAt).toEqual(saved.dueDate)
+        expect(paidAt.getMonth()).toBe(8) // setembro
+    })
+
+    it('transação manual (não importada) fica PENDING com paidAt null', async () => {
+        const deps = makeDeps()
+        const sut = new PersistTransactionHandler(
+            deps.userRepository, deps.transactionRepository, deps.creditCardRepository,
+        )
+
+        await sut.handle(makeTx({ isCreditCardInvoice: false }))
+
+        const saved = vi.mocked(deps.transactionRepository.create).mock.calls[0][0]
+        expect(saved.paymentStatus).toBe('PENDING')
+        expect(saved.paidAt).toBeNull()
+    })
+})
+
 describe('PersistTransactionHandler — dueDate em importação de fatura', () => {
 
     it('usa o mês seguinte ao anchorDate quando isCreditCardInvoice=true (fatura Inter fev → mar)', async () => {
