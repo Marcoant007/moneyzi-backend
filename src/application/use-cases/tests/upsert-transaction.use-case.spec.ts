@@ -61,6 +61,15 @@ describe('UpsertTransactionUseCase', () => {
         expect(transactionRepository.upsert).not.toHaveBeenCalled()
     })
 
+    it('aceita amount negativo (linha de crédito/abatimento numa fatura)', async () => {
+        const { transactionRepository, accountRepository } = makeRepositories()
+        const sut = new UpsertTransactionUseCase(transactionRepository, accountRepository)
+
+        await sut.execute({ ...baseParams, amount: -26.55 })
+
+        expect(transactionRepository.upsert).toHaveBeenCalledOnce()
+    })
+
     describe('validação de saldo para EXPENSE em conta', () => {
         // Conta: initialBalance 0 + depósito 100 = saldo R$ 100
         function setupExpenseMocks(overrides?: { findById?: any; groupAccountMovements?: any }) {

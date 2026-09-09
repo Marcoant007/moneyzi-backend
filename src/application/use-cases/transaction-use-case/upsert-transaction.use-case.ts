@@ -5,7 +5,8 @@ import type { AccountRepository } from '@/application/repositories/account-repos
 const upsertTransactionSchema = z.object({
     id: z.string().optional(),
     name: z.string().min(1),
-    amount: z.number().positive(),
+    // Aceita valor negativo (ex.: linha de crédito/abatimento numa fatura); só não pode ser zero.
+    amount: z.number().refine((value) => value !== 0, { message: 'amount must not be zero' }),
     type: z.enum(['DEPOSIT', 'EXPENSE', 'INVESTMENT']),
     category: z.enum(['HOUSING', 'TRANSPORTATION', 'FOOD', 'ENTERTAINMENT', 'HEALTH', 'UTILITY', 'SALARY', 'EDUCATION', 'OTHER', 'SIGNATURE', 'FOOD_DELIVERY', 'GAMING', 'SERVICES', 'STREAMING']),
     categoryId: z.string().optional().nullable(),
