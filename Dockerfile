@@ -10,7 +10,9 @@ COPY prisma ./prisma
 COPY scripts ./scripts
 
 # Install pnpm and dependencies
-RUN npm install -g pnpm
+# Pin pnpm to the version in package.json's "packageManager" — pnpm >=10.16
+# refuses to run if the installed binary can't be verified against that field.
+RUN npm install -g pnpm@10.6.3
 RUN pnpm install --frozen-lockfile
 RUN pnpm exec prisma generate || true
 
@@ -23,8 +25,8 @@ FROM node:18-alpine AS production
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (same pinned version as the builder stage)
+RUN npm install -g pnpm@10.6.3
 
 # Copy package files and install only production dependencies
 # Copy package files, prisma schema and scripts
