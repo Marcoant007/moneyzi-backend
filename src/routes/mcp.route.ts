@@ -42,5 +42,16 @@ export async function mcpRoutes(app: FastifyInstance) {
             reply.hijack()
             await nodeHandler(request.raw, reply.raw, request.body)
         })
+
+        // Servidor stateless: não abre stream SSE nem mantém sessão. Por spec do
+        // Streamable HTTP, GET/DELETE devem responder 405 (não 404) para o
+        // cliente MCP reconhecer que deve seguir só com POST.
+        mcpApp.get('/mcp', async (_request, reply) => {
+            reply.header('Allow', 'POST').status(405).send({ error: 'Method Not Allowed' })
+        })
+
+        mcpApp.delete('/mcp', async (_request, reply) => {
+            reply.header('Allow', 'POST').status(405).send({ error: 'Method Not Allowed' })
+        })
     })
 }
