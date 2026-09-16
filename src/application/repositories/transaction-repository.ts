@@ -31,6 +31,22 @@ export interface TransactionListItem {
     account: { id: string; name: string } | null
 }
 
+export interface McpTransactionSnapshot {
+    id: string
+    name: string
+    amount: number
+    date: Date
+    categoryId: string | null
+    category: TransactionCategory
+}
+
+export interface McpTransactionFilter {
+    nameContains?: string
+    currentCategoryId?: string
+    dateFrom?: Date
+    dateTo?: Date
+}
+
 export interface UpsertTransactionData {
     id?: string
     name: string
@@ -107,4 +123,7 @@ export interface TransactionRepository {
     markAsPaid(ids: string[], paidAt?: Date): Promise<void>
     markAsPending(ids: string[]): Promise<void>
     findRecurringNextOccurrence(userId: string, name: string, month: number, year: number): Promise<{ id: string } | null>
+    // MCP write tools (bulk category reclassification)
+    findManyByFilter(userId: string, filter: McpTransactionFilter, limit: number): Promise<McpTransactionSnapshot[]>
+    findManyByIdsWithCategory(ids: string[], userId: string): Promise<McpTransactionSnapshot[]>
 }

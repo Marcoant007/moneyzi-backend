@@ -18,7 +18,10 @@ export interface CategoryRepository {
     update(id: string, data: UpdateCategoryData): Promise<Category>
     delete(id: string): Promise<void>
     existsByName(userId: string, name: string, parentId: string | null): Promise<boolean>
+    findByNameAndParent(userId: string, name: string, parentId: string | null): Promise<Category | null>
     hasTransactions(id: string): Promise<boolean>
     hasChildren(id: string): Promise<boolean>
     hasGrandchildren(id: string): Promise<boolean>
+    /** Contagem direta (não somada com descendentes) de transações por categoria, pra todas as categorias do usuário de uma vez. */
+    countTransactionsByCategoryId(userId: string): Promise<Map<string, number>>
 }

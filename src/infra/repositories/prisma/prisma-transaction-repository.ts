@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { TransactionRepository, PayablesFilter, UpsertTransactionData } from '@/application/repositories/transaction-repository'
+import type { TransactionRepository, PayablesFilter, UpsertTransactionData, McpTransactionFilter, McpTransactionSnapshot } from '@/application/repositories/transaction-repository'
 import type { Prisma, TransactionCategory, TransactionType } from '@prisma/client'
 
 // Categorias que são consideradas fixas mesmo sem o flag isRecurring=true
@@ -588,4 +588,47 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
+    private static readonly mcpSnapshotSelect = {
+        id: true,
+        name: true,
+        amount: true,
+        date: true,
+        categoryId: true,
+        category: true,
+    } as const
+
+    async findManyByFilter(userId: string, filter: McpTransactionFilter, limit: number): Promise<McpTransactionSnapshot[]> {
+        const where: Prisma.TransactionWhereInput = { userId, deletedAt: null }
+
+        if (filter.nameContains) {
+            where.name = { contains: filter.nameContains, mode: 'insensitive' }
+        }
+        if (filter.currentCategoryId) {
+            where.categoryId = filter.currentCategoryId
+        }
+        if (filter.dateFrom || filter.dateTo) {
+            where.date = {
+                ...(filter.dateFrom ? { gte: filter.dateFrom } : {}),
+                ...(filter.dateTo ? { lte: filter.dateTo } : {}),
+            }
+        }
+
+        const transactions = await prisma.transaction.findMany({
+            where,
+            select: PrismaTransactionRepository.mcpSnapshotSelect,
+            orderBy: { date: 'desc' },
+            take: limit,
+        })
+
+        return transactions.map((t) => ({ ...t, amount: Number(t.amount) }))
+    }
+
+    async findManyByIdsWithCategory(ids: string[], userId: string): Promise<McpTransactionSnapshot[]> {
+        const transactions = await prisma.transaction.findMany({
+            where: { id: { in: ids }, userId, deletedAt: null },
+            select: PrismaTransactionRepository.mcpSnapshotSelect,
+        })
+
+        return transactions.map((t) => ({ ...t, amount: Number(t.amount) }))
+    }
 }

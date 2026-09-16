@@ -5,18 +5,20 @@ const summarySelect = {
     id: true,
     name: true,
     client: true,
+    scope: true,
     createdAt: true,
     lastUsedAt: true,
     revokedAt: true,
 } as const
 
 export class PrismaMcpTokenRepository implements McpTokenRepository {
-    async create(data: { userId: string; name: string | null; client: string | null; tokenHash: string }): Promise<McpTokenSummary> {
+    async create(data: { userId: string; name: string | null; client: string | null; scope: string; tokenHash: string }): Promise<McpTokenSummary> {
         return prisma.mcpToken.create({
             data: {
                 userId: data.userId,
                 name: data.name,
                 client: data.client,
+                scope: data.scope,
                 tokenHash: data.tokenHash,
             },
             select: summarySelect,
@@ -34,7 +36,7 @@ export class PrismaMcpTokenRepository implements McpTokenRepository {
     async findActiveByTokenHash(tokenHash: string): Promise<ActiveMcpToken | null> {
         const token = await prisma.mcpToken.findFirst({
             where: { tokenHash, revokedAt: null },
-            select: { id: true, userId: true },
+            select: { id: true, userId: true, scope: true },
         })
         return token
     }

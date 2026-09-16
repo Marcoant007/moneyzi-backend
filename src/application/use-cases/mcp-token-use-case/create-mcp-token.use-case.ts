@@ -4,7 +4,7 @@ import { generateMcpToken, hashMcpToken } from '@/utils/mcp-token.utils'
 export class CreateMcpTokenUseCase {
     constructor(private readonly mcpTokenRepository: McpTokenRepository) {}
 
-    async execute(userId: string, name?: string, client?: string) {
+    async execute(userId: string, name?: string, client?: string, scope: string = 'read') {
         const token = generateMcpToken()
         const tokenHash = hashMcpToken(token)
 
@@ -12,6 +12,7 @@ export class CreateMcpTokenUseCase {
             userId,
             name: name?.trim() || null,
             client: client?.trim() || null,
+            scope,
             tokenHash,
         })
 

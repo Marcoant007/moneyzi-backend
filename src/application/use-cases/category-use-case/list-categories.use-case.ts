@@ -9,10 +9,13 @@ export class ListCategoriesUseCase {
         private transactionRepository: TransactionRepository
     ) { }
 
-    async execute(userId: string): Promise<Array<{ id: string; name: string; parentId: string | null; createdAt: Date; totalSpend: number }>> {
+    async execute(userId: string): Promise<Array<{ id: string; name: string; parentId: string | null; createdAt: Date; totalSpend: number; transactionCount: number }>> {
         const categories = await this.categoryRepository.listByUserId(userId)
 
-        const spendStats = await this.transactionRepository.groupExpensesByCategoryId(userId)
+        const [spendStats, transactionCountMap] = await Promise.all([
+            this.transactionRepository.groupExpensesByCategoryId(userId),
+            this.categoryRepository.countTransactionsByCategoryId(userId),
+        ])
 
         const directSpendMap = new Map<string, number>()
         for (const stat of spendStats) {
@@ -29,7 +32,8 @@ export class ListCategoriesUseCase {
             name: category.name,
             parentId: category.parentId,
             createdAt: category.createdAt,
-            totalSpend: rolledUpSpendMap.get(category.id) || 0
+            totalSpend: rolledUpSpendMap.get(category.id) || 0,
+            transactionCount: transactionCountMap.get(category.id) || 0,
         }))
     }
 }

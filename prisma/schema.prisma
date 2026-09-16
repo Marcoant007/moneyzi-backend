@@ -142,6 +142,7 @@ model User {
   financialGoalSettings FinancialGoalSettings?
   aiDeepAnalyses        AiDeepAnalysis[]
   mcpTokens             McpToken[]
+  mcpAuditLogs          McpAuditLog[]
 }
 
 model McpToken {
@@ -150,10 +151,25 @@ model McpToken {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String?
   client     String?
+  scope      String    @default("read")
   tokenHash  String    @unique
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
   revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+model McpAuditLog {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool          String
+  params        Json
+  previousState Json
+  newState      Json
+  createdAt     DateTime  @default(now())
+  rolledBackAt  DateTime?
 
   @@index([userId])
 }

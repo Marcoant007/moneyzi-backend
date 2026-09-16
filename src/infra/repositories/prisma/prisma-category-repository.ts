@@ -49,6 +49,19 @@ export class PrismaCategoryRepository implements CategoryRepository {
         return !!category
     }
 
+    async findByNameAndParent(userId: string, name: string, parentId: string | null): Promise<Category | null> {
+        return prisma.category.findFirst({
+            where: {
+                userId,
+                parentId,
+                name: {
+                    equals: name,
+                    mode: 'insensitive'
+                }
+            }
+        })
+    }
+
     async hasTransactions(id: string): Promise<boolean> {
         const count = await prisma.transaction.count({
             where: {
@@ -76,5 +89,15 @@ export class PrismaCategoryRepository implements CategoryRepository {
             }
         })
         return count > 0
+    }
+
+    async countTransactionsByCategoryId(userId: string): Promise<Map<string, number>> {
+        const groups = await prisma.transaction.groupBy({
+            by: ['categoryId'],
+            where: { userId, categoryId: { not: null }, deletedAt: null },
+            _count: { _all: true },
+        })
+
+        return new Map(groups.filter((g) => g.categoryId).map((g) => [g.categoryId as string, g._count._all]))
     }
 }

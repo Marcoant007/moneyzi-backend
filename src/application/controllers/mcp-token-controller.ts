@@ -8,6 +8,7 @@ import { DeleteMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-cas
 const createBodySchema = z.object({
     name: z.string().max(100).optional(),
     client: z.enum(['claude', 'chatgpt', 'gemini']).optional(),
+    scope: z.enum(['read', 'read_write']).optional().default('read'),
 })
 
 export class McpTokenController {
@@ -25,8 +26,8 @@ export class McpTokenController {
         }
 
         try {
-            const { name, client } = createBodySchema.parse(request.body ?? {})
-            const result = await this.createMcpTokenUseCase.execute(userId, name, client)
+            const { name, client, scope } = createBodySchema.parse(request.body ?? {})
+            const result = await this.createMcpTokenUseCase.execute(userId, name, client, scope)
             return reply.status(201).send(result)
         } catch (error: any) {
             console.error(error)

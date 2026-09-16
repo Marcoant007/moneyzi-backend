@@ -19,6 +19,7 @@ function makeCategory(overrides: Partial<Category>): Category {
 function makeRepositories(categories: Category[], spendByCategoryId: Record<string, number>) {
     const categoryRepository = {
         listByUserId: vi.fn().mockResolvedValue(categories),
+        countTransactionsByCategoryId: vi.fn().mockResolvedValue(new Map()),
     } as unknown as CategoryRepository
 
     const transactionRepository = {
@@ -45,7 +46,7 @@ describe('ListCategoriesUseCase', () => {
         const result = await sut.execute('user-1')
 
         expect(result).toEqual([
-            { id: 'cat-1', name: 'Transporte', parentId: null, createdAt: expect.any(Date), totalSpend: 150 },
+            { id: 'cat-1', name: 'Transporte', parentId: null, createdAt: expect.any(Date), totalSpend: 150, transactionCount: 0 },
         ])
     })
 

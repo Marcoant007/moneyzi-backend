@@ -9,15 +9,25 @@ import { ListTransactionsUseCase } from '@/application/use-cases/transaction-use
 import { GetPayablesReceivablesUseCase } from '@/application/use-cases/payables-use-case/get-payables-receivables.use-case'
 import { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
 import { GetCategoryMonthMatrixUseCase } from '@/application/use-cases/dashboard-use-case/get-category-month-matrix.use-case'
+import { ListCategoriesUseCase } from '@/application/use-cases/category-use-case/list-categories.use-case'
+import { CreateCategoryUseCase } from '@/application/use-cases/category-use-case/create-category.use-case'
+import { DeleteCategoryUseCase } from '@/application/use-cases/category-use-case/delete-category.use-case'
+import { UpdateMultipleTransactionsUseCase } from '@/application/use-cases/transaction-use-case/update-multiple-transactions.use-case'
+import { CreateCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-category-for-mcp.use-case'
+import { MoveTransactionCategoryUseCase } from '@/application/use-cases/mcp-write-use-case/move-transaction-category.use-case'
+import { BulkMoveTransactionsUseCase } from '@/application/use-cases/mcp-write-use-case/bulk-move-transactions.use-case'
+import { RollbackOperationUseCase } from '@/application/use-cases/mcp-write-use-case/rollback-operation.use-case'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 import { PrismaAccountRepository } from '@/infra/repositories/prisma/prisma-account-repository'
+import { PrismaMcpAuditLogRepository } from '@/infra/repositories/prisma/prisma-mcp-audit-log-repository'
 
 /**
  * Servidor MCP pessoal: qualquer token pessoal válido (ver mcp-bearer-auth.ts,
  * gerenciados em /mcp-tokens) dá acesso — sempre escopado ao dono do token,
  * nunca a um userId fixo. As tools são montadas por requisição, usando o
- * userId que a auth resolveu para aquela chamada específica.
+ * userId e o scope que a auth resolveu para aquela chamada específica — as
+ * tools de escrita só entram na lista quando o token tem scope read_write.
  */
 export async function mcpRoutes(app: FastifyInstance) {
     await app.register(async (mcpApp) => {
@@ -25,21 +35,49 @@ export async function mcpRoutes(app: FastifyInstance) {
 
         mcpApp.post('/mcp', async (request, reply) => {
             const userId = request.mcpUserId
-            if (!userId) {
+            const scope = request.mcpScope
+            if (!userId || !scope) {
                 return reply.status(401).send({ error: 'Invalid or missing bearer token' })
             }
 
             const transactionRepository = new PrismaTransactionRepository()
             const categoryRepository = new PrismaCategoryRepository()
             const accountRepository = new PrismaAccountRepository()
+            const mcpAuditLogRepository = new PrismaMcpAuditLogRepository()
+
+            const updateMultipleTransactionsUseCase = new UpdateMultipleTransactionsUseCase(transactionRepository)
 
             const tools = buildMcpTools({
                 userId,
+                scope,
                 getMonthlySummaryUseCase: new GetMonthlySummaryUseCase(transactionRepository, categoryRepository),
                 listTransactionsUseCase: new ListTransactionsUseCase(transactionRepository),
                 getPayablesReceivablesUseCase: new GetPayablesReceivablesUseCase(transactionRepository),
                 listAccountsUseCase: new ListAccountsUseCase(accountRepository),
                 getCategoryMonthMatrixUseCase: new GetCategoryMonthMatrixUseCase(transactionRepository, categoryRepository),
+                listCategoriesUseCase: new ListCategoriesUseCase(categoryRepository, transactionRepository),
+                createCategoryForMcpUseCase: new CreateCategoryForMcpUseCase(
+                    categoryRepository,
+                    new CreateCategoryUseCase(categoryRepository),
+                    mcpAuditLogRepository,
+                ),
+                moveTransactionCategoryUseCase: new MoveTransactionCategoryUseCase(
+                    transactionRepository,
+                    categoryRepository,
+                    updateMultipleTransactionsUseCase,
+                    mcpAuditLogRepository,
+                ),
+                bulkMoveTransactionsUseCase: new BulkMoveTransactionsUseCase(
+                    transactionRepository,
+                    categoryRepository,
+                    updateMultipleTransactionsUseCase,
+                    mcpAuditLogRepository,
+                ),
+                rollbackOperationUseCase: new RollbackOperationUseCase(
+                    mcpAuditLogRepository,
+                    transactionRepository,
+                    new DeleteCategoryUseCase(categoryRepository),
+                ),
             })
 
             const handler = createMcpHandler(() => buildMcpServer(tools))

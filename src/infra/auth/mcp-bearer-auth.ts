@@ -5,6 +5,7 @@ import { hashMcpToken } from '@/utils/mcp-token.utils'
 declare module 'fastify' {
     interface FastifyRequest {
         mcpUserId?: string
+        mcpScope?: string
     }
 }
 
@@ -33,6 +34,7 @@ export default async function mcpBearerAuth(app: FastifyInstance) {
         }
 
         request.mcpUserId = activeToken.userId
+        request.mcpScope = activeToken.scope
         void mcpTokenRepository.touchLastUsedAt(activeToken.id).catch(() => {
             // best-effort; não deve bloquear/derrubar a chamada MCP
         })
