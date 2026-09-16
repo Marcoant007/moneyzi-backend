@@ -4,6 +4,7 @@ import type { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard
 import type { ListTransactionsUseCase } from '@/application/use-cases/transaction-use-case/list-transactions.use-case'
 import type { GetPayablesReceivablesUseCase } from '@/application/use-cases/payables-use-case/get-payables-receivables.use-case'
 import type { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
+import type { GetCategoryMonthMatrixUseCase, MatrixRow } from '@/application/use-cases/dashboard-use-case/get-category-month-matrix.use-case'
 
 /**
  * Servidor pessoal: existe um único dono (MCP_OWNER_USER_ID), então cada tool
@@ -31,6 +32,15 @@ interface McpToolsDeps {
     listTransactionsUseCase: ListTransactionsUseCase
     getPayablesReceivablesUseCase: GetPayablesReceivablesUseCase
     listAccountsUseCase: ListAccountsUseCase
+    getCategoryMonthMatrixUseCase: GetCategoryMonthMatrixUseCase
+}
+
+function rowToByMonth(row: MatrixRow, months: string[]) {
+    return {
+        category: row.name,
+        depth: row.depth,
+        byMonth: Object.fromEntries(months.map((m, i) => [m, row.monthlyTotals[i]])),
+    }
 }
 
 export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
@@ -116,6 +126,32 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
             inputSchema: {},
             execute: async () => {
                 return deps.listAccountsUseCase.execute(userId)
+            },
+        },
+        {
+            name: 'get_category_totals_by_month',
+            description:
+                'Retorna o total de despesas e de receitas por categoria, mês a mês, ao longo de um ano inteiro (subcategorias já somadas dentro da categoria principal). Use para perguntas que cruzam vários meses, tipo "qual categoria eu mais gastei nos últimos meses", "como evoluiu meu gasto com X esse ano" ou "meu aluguel subiu?".',
+            inputSchema: {
+                year: z.number().int().min(2000).max(2100).optional().describe('Ano (ex: 2026). Se omitido, usa o ano atual.'),
+            },
+            execute: async (args) => {
+                const { year } = z.object({ year: z.number().int().optional() }).parse(args)
+                const result = await deps.getCategoryMonthMatrixUseCase.execute({
+                    userId,
+                    year: year ?? new Date().getFullYear(),
+                })
+
+                return {
+                    months: result.months,
+                    monthlyBalance: Object.fromEntries(result.months.map((m, i) => [m, result.balance[i]])),
+                    expenseByCategory: result.expense.rows
+                        .filter((row) => !row.isLegacy)
+                        .map((row) => rowToByMonth(row, result.months)),
+                    incomeByCategory: result.income.rows
+                        .filter((row) => !row.isLegacy)
+                        .map((row) => rowToByMonth(row, result.months)),
+                }
             },
         },
     ]

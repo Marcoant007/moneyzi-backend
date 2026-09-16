@@ -8,6 +8,7 @@ import { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-
 import { ListTransactionsUseCase } from '@/application/use-cases/transaction-use-case/list-transactions.use-case'
 import { GetPayablesReceivablesUseCase } from '@/application/use-cases/payables-use-case/get-payables-receivables.use-case'
 import { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
+import { GetCategoryMonthMatrixUseCase } from '@/application/use-cases/dashboard-use-case/get-category-month-matrix.use-case'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 import { PrismaAccountRepository } from '@/infra/repositories/prisma/prisma-account-repository'
@@ -38,6 +39,7 @@ export async function mcpRoutes(app: FastifyInstance) {
                 listTransactionsUseCase: new ListTransactionsUseCase(transactionRepository),
                 getPayablesReceivablesUseCase: new GetPayablesReceivablesUseCase(transactionRepository),
                 listAccountsUseCase: new ListAccountsUseCase(accountRepository),
+                getCategoryMonthMatrixUseCase: new GetCategoryMonthMatrixUseCase(transactionRepository, categoryRepository),
             })
 
             const handler = createMcpHandler(() => buildMcpServer(tools))
