@@ -1,6 +1,7 @@
 export interface McpTokenSummary {
     id: string
     name: string | null
+    client: string | null
     createdAt: Date
     lastUsedAt: Date | null
     revokedAt: Date | null
@@ -12,7 +13,7 @@ export interface ActiveMcpToken {
 }
 
 export interface McpTokenRepository {
-    create(data: { userId: string; name: string | null; tokenHash: string }): Promise<McpTokenSummary>
+    create(data: { userId: string; name: string | null; client: string | null; tokenHash: string }): Promise<McpTokenSummary>
     findManyByUserId(userId: string): Promise<McpTokenSummary[]>
     findActiveByTokenHash(tokenHash: string): Promise<ActiveMcpToken | null>
     touchLastUsedAt(id: string): Promise<void>

@@ -6,6 +6,7 @@ import { RevokeMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-cas
 
 const createBodySchema = z.object({
     name: z.string().max(100).optional(),
+    client: z.enum(['claude', 'chatgpt', 'gemini']).optional(),
 })
 
 export class McpTokenController {
@@ -22,8 +23,8 @@ export class McpTokenController {
         }
 
         try {
-            const { name } = createBodySchema.parse(request.body ?? {})
-            const result = await this.createMcpTokenUseCase.execute(userId, name)
+            const { name, client } = createBodySchema.parse(request.body ?? {})
+            const result = await this.createMcpTokenUseCase.execute(userId, name, client)
             return reply.status(201).send(result)
         } catch (error: any) {
             console.error(error)

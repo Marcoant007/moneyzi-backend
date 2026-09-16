@@ -149,6 +149,7 @@ model McpToken {
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String?
+  client     String?
   tokenHash  String    @unique
   createdAt  DateTime  @default(now())
   lastUsedAt DateTime?

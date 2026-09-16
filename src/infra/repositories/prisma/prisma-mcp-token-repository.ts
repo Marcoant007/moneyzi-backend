@@ -4,17 +4,19 @@ import { prisma } from '@/lib/prisma'
 const summarySelect = {
     id: true,
     name: true,
+    client: true,
     createdAt: true,
     lastUsedAt: true,
     revokedAt: true,
 } as const
 
 export class PrismaMcpTokenRepository implements McpTokenRepository {
-    async create(data: { userId: string; name: string | null; tokenHash: string }): Promise<McpTokenSummary> {
+    async create(data: { userId: string; name: string | null; client: string | null; tokenHash: string }): Promise<McpTokenSummary> {
         return prisma.mcpToken.create({
             data: {
                 userId: data.userId,
                 name: data.name,
+                client: data.client,
                 tokenHash: data.tokenHash,
             },
             select: summarySelect,

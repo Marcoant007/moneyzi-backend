@@ -20,18 +20,20 @@ describe('CreateMcpTokenUseCase', () => {
         repository.create.mockImplementation(async (data: any) => ({
             id: 'token-1',
             name: data.name,
+            client: data.client,
             createdAt: new Date('2026-01-01'),
             lastUsedAt: null,
             revokedAt: null,
         }))
 
         const useCase = new CreateMcpTokenUseCase(repository)
-        const result = await useCase.execute('user-1', 'ChatGPT')
+        const result = await useCase.execute('user-1', 'ChatGPT', 'chatgpt')
 
         expect(repository.create).toHaveBeenCalledTimes(1)
         const callArg = repository.create.mock.calls[0][0]
         expect(callArg.userId).toBe('user-1')
         expect(callArg.name).toBe('ChatGPT')
+        expect(callArg.client).toBe('chatgpt')
         expect(callArg.tokenHash).toBe(hashMcpToken(result.token))
         expect(callArg.tokenHash).not.toBe(result.token)
         expect(result.token).toMatch(/^[0-9a-f]{64}$/)
@@ -40,12 +42,13 @@ describe('CreateMcpTokenUseCase', () => {
 
     it('normalizes a blank name to null', async () => {
         const repository = buildRepository()
-        repository.create.mockResolvedValue({ id: 't', name: null, createdAt: new Date(), lastUsedAt: null, revokedAt: null })
+        repository.create.mockResolvedValue({ id: 't', name: null, client: null, createdAt: new Date(), lastUsedAt: null, revokedAt: null })
 
         const useCase = new CreateMcpTokenUseCase(repository)
         await useCase.execute('user-1', '   ')
 
         expect(repository.create.mock.calls[0][0].name).toBeNull()
+        expect(repository.create.mock.calls[0][0].client).toBeNull()
     })
 })
 
