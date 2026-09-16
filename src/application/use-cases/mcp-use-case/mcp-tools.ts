@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import type { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-case/get-monthly-summary.use-case'
 import type { ListTransactionsUseCase } from '@/application/use-cases/transaction-use-case/list-transactions.use-case'
 import type { GetPayablesReceivablesUseCase } from '@/application/use-cases/payables-use-case/get-payables-receivables.use-case'
+import type { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
 
 /**
  * Servidor pessoal: existe um único dono (MCP_OWNER_USER_ID), então cada tool
@@ -29,6 +30,7 @@ interface McpToolsDeps {
     getMonthlySummaryUseCase: GetMonthlySummaryUseCase
     listTransactionsUseCase: ListTransactionsUseCase
     getPayablesReceivablesUseCase: GetPayablesReceivablesUseCase
+    listAccountsUseCase: ListAccountsUseCase
 }
 
 export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
@@ -87,7 +89,7 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
         {
             name: 'get_payables_receivables',
             description:
-                'Retorna contas a pagar e a receber (incluindo faturas de cartão em aberto), com status de pagamento (pago, pendente, atrasado) e a projeção líquida do período.',
+                'Retorna contas a pagar e a receber (incluindo faturas de cartão em aberto), com status de pagamento (pago, pendente, atrasado), data de vencimento e a projeção líquida do período. Chame sem "month"/"year" para ver todas as contas pendentes/atrasadas de qualquer período — é a forma certa de responder "o que vence em breve" ou "o que está atrasado".',
             inputSchema: {
                 month: z.number().int().min(1).max(12).optional().describe('Mês (1-12). Se omitido, considera todos os períodos.'),
                 year: z.number().int().min(2000).max(2100).optional().describe('Ano (ex: 2026). Se omitido, considera todos os períodos.'),
@@ -105,6 +107,15 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
                     month: parsed.month,
                     year: parsed.year,
                 })
+            },
+        },
+        {
+            name: 'get_accounts',
+            description:
+                'Retorna todas as contas do usuário (corrente, poupança, investimento, dinheiro, cofrinho, outra) com o saldo atual de cada uma e o saldo total. Use para responder perguntas sobre quanto está investido, saldo em conta corrente/poupança, ou patrimônio total em contas.',
+            inputSchema: {},
+            execute: async () => {
+                return deps.listAccountsUseCase.execute(userId)
             },
         },
     ]

@@ -7,6 +7,7 @@ function buildDeps() {
         getMonthlySummaryUseCase: { execute: vi.fn().mockResolvedValue({ income: 100 }) } as any,
         listTransactionsUseCase: { execute: vi.fn().mockResolvedValue([]) } as any,
         getPayablesReceivablesUseCase: { execute: vi.fn().mockResolvedValue({ payables: {} }) } as any,
+        listAccountsUseCase: { execute: vi.fn().mockResolvedValue({ totalBalance: 0, accounts: [] }) } as any,
     }
 }
 
@@ -48,6 +49,16 @@ describe('buildMcpTools', () => {
             month: 3,
             year: 2026,
         })
+    })
+
+    it('get_accounts always uses the fixed owner userId', async () => {
+        const deps = buildDeps()
+        const tools = buildMcpTools(deps)
+        const tool = tools.find((t) => t.name === 'get_accounts')!
+
+        await tool.execute({ userId: 'someone-else' })
+
+        expect(deps.listAccountsUseCase.execute).toHaveBeenCalledWith('owner-user-1')
     })
 
     it('falls back to the current month/year when list_transactions args are empty', async () => {

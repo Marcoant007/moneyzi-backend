@@ -7,8 +7,10 @@ import { buildMcpTools } from '@/application/use-cases/mcp-use-case/mcp-tools'
 import { GetMonthlySummaryUseCase } from '@/application/use-cases/dashboard-use-case/get-monthly-summary.use-case'
 import { ListTransactionsUseCase } from '@/application/use-cases/transaction-use-case/list-transactions.use-case'
 import { GetPayablesReceivablesUseCase } from '@/application/use-cases/payables-use-case/get-payables-receivables.use-case'
+import { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
+import { PrismaAccountRepository } from '@/infra/repositories/prisma/prisma-account-repository'
 
 /**
  * Servidor MCP pessoal: qualquer token pessoal válido (ver mcp-bearer-auth.ts,
@@ -28,12 +30,14 @@ export async function mcpRoutes(app: FastifyInstance) {
 
             const transactionRepository = new PrismaTransactionRepository()
             const categoryRepository = new PrismaCategoryRepository()
+            const accountRepository = new PrismaAccountRepository()
 
             const tools = buildMcpTools({
                 userId,
                 getMonthlySummaryUseCase: new GetMonthlySummaryUseCase(transactionRepository, categoryRepository),
                 listTransactionsUseCase: new ListTransactionsUseCase(transactionRepository),
                 getPayablesReceivablesUseCase: new GetPayablesReceivablesUseCase(transactionRepository),
+                listAccountsUseCase: new ListAccountsUseCase(accountRepository),
             })
 
             const handler = createMcpHandler(() => buildMcpServer(tools))
