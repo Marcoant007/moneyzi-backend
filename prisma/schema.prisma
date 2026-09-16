@@ -141,6 +141,20 @@ model User {
   creditCards           CreditCard[]
   financialGoalSettings FinancialGoalSettings?
   aiDeepAnalyses        AiDeepAnalysis[]
+  mcpTokens             McpToken[]
+}
+
+model McpToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String?
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
 }
 
 model Category {

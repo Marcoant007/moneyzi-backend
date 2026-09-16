@@ -15,6 +15,8 @@ import { accountRoutes } from '@routes/account.route'
 import { transferRoutes } from '@routes/transfer.route'
 import { transactionRoutes } from '@routes/transaction.route'
 import { meRoutes } from '@routes/me.route'
+import { mcpRoutes } from '@routes/mcp.route'
+import { mcpTokenRoutes } from '@routes/mcp-token.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -30,6 +32,7 @@ async function bootstrap() {
 
     await app.register(cronRoutes)
     await app.register(userRoutes)
+    await app.register(mcpRoutes)
 
     await app.register(async (protectedApp) => {
         await headerAuth(protectedApp)
@@ -46,6 +49,7 @@ async function bootstrap() {
         protectedApp.register(transferRoutes)
         protectedApp.register(transactionRoutes)
         protectedApp.register(meRoutes)
+        protectedApp.register(mcpTokenRoutes)
     })
 
     if (process.env.DISABLE_QUEUE === 'true') {
