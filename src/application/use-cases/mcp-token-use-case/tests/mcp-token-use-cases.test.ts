@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { CreateMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/create-mcp-token.use-case'
 import { ListMcpTokensUseCase } from '@/application/use-cases/mcp-token-use-case/list-mcp-tokens.use-case'
 import { RevokeMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/revoke-mcp-token.use-case'
+import { DeleteMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/delete-mcp-token.use-case'
 import { hashMcpToken } from '@/utils/mcp-token.utils'
 
 function buildRepository() {
@@ -11,6 +12,7 @@ function buildRepository() {
         findActiveByTokenHash: vi.fn(),
         touchLastUsedAt: vi.fn(),
         revoke: vi.fn(),
+        hardDeleteRevoked: vi.fn(),
     }
 }
 
@@ -83,6 +85,29 @@ describe('RevokeMcpTokenUseCase', () => {
 
         const useCase = new RevokeMcpTokenUseCase(repository)
         const result = await useCase.execute('token-1', 'someone-else')
+
+        expect(result).toBe(false)
+    })
+})
+
+describe('DeleteMcpTokenUseCase', () => {
+    it('delegates to the repository hardDeleteRevoked with both the token id and the owner userId', async () => {
+        const repository = buildRepository()
+        repository.hardDeleteRevoked.mockResolvedValue(true)
+
+        const useCase = new DeleteMcpTokenUseCase(repository)
+        const result = await useCase.execute('token-1', 'user-1')
+
+        expect(repository.hardDeleteRevoked).toHaveBeenCalledWith('token-1', 'user-1')
+        expect(result).toBe(true)
+    })
+
+    it('returns false when the token is not found, not owned, or not yet revoked', async () => {
+        const repository = buildRepository()
+        repository.hardDeleteRevoked.mockResolvedValue(false)
+
+        const useCase = new DeleteMcpTokenUseCase(repository)
+        const result = await useCase.execute('token-1', 'user-1')
 
         expect(result).toBe(false)
     })

@@ -3,6 +3,7 @@ import { McpTokenController } from '@/application/controllers/mcp-token-controll
 import { CreateMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/create-mcp-token.use-case'
 import { ListMcpTokensUseCase } from '@/application/use-cases/mcp-token-use-case/list-mcp-tokens.use-case'
 import { RevokeMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/revoke-mcp-token.use-case'
+import { DeleteMcpTokenUseCase } from '@/application/use-cases/mcp-token-use-case/delete-mcp-token.use-case'
 import { PrismaMcpTokenRepository } from '@/infra/repositories/prisma/prisma-mcp-token-repository'
 
 function buildMcpTokenController(): McpTokenController {
@@ -12,6 +13,7 @@ function buildMcpTokenController(): McpTokenController {
         new CreateMcpTokenUseCase(mcpTokenRepository),
         new ListMcpTokensUseCase(mcpTokenRepository),
         new RevokeMcpTokenUseCase(mcpTokenRepository),
+        new DeleteMcpTokenUseCase(mcpTokenRepository),
     )
 }
 
@@ -21,4 +23,5 @@ export async function mcpTokenRoutes(app: FastifyInstance) {
     app.post('/mcp-tokens', (req, reply) => controller.create(req, reply))
     app.get('/mcp-tokens', (req, reply) => controller.list(req, reply))
     app.delete('/mcp-tokens/:id', (req, reply) => controller.revoke(req, reply))
+    app.delete('/mcp-tokens/:id/permanent', (req, reply) => controller.deletePermanently(req, reply))
 }

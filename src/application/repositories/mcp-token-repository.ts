@@ -18,4 +18,6 @@ export interface McpTokenRepository {
     findActiveByTokenHash(tokenHash: string): Promise<ActiveMcpToken | null>
     touchLastUsedAt(id: string): Promise<void>
     revoke(id: string, userId: string): Promise<boolean>
+    /** Só apaga de fato se o token já estiver revogado — proteção contra apagar um token ainda em uso. */
+    hardDeleteRevoked(id: string, userId: string): Promise<boolean>
 }

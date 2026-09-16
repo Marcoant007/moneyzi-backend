@@ -53,4 +53,11 @@ export class PrismaMcpTokenRepository implements McpTokenRepository {
         })
         return result.count > 0
     }
+
+    async hardDeleteRevoked(id: string, userId: string): Promise<boolean> {
+        const result = await prisma.mcpToken.deleteMany({
+            where: { id, userId, revokedAt: { not: null } },
+        })
+        return result.count > 0
+    }
 }
