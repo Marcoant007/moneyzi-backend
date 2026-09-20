@@ -50,13 +50,15 @@ export class InMemoryWorld {
         return `${prefix}-${this.sequence}`
     }
 
-    addCategory(input: { id?: string; name: string; userId: string; parentId?: string | null; createdAt?: Date }): Category {
+    addCategory(input: { id?: string; name: string; userId: string; parentId?: string | null; createdAt?: Date; color?: string | null; icon?: string | null }): Category {
         const now = new Date('2026-01-01T00:00:00.000Z')
         const category: Category = {
             id: input.id ?? this.nextId('cat'),
             name: input.name,
             userId: input.userId,
             parentId: input.parentId ?? null,
+            color: input.color ?? null,
+            icon: input.icon ?? null,
             createdAt: input.createdAt ?? now,
             updatedAt: now,
         }
@@ -116,7 +118,7 @@ export class InMemoryCategoryRepository implements CategoryRepository {
     async create(data: CreateCategoryData): Promise<Category> {
         const id = this.world.nextId('cat')
         this.assertUnique({ id, userId: data.userId, parentId: data.parentId ?? null, name: data.name })
-        return this.world.addCategory({ id, name: data.name, userId: data.userId, parentId: data.parentId ?? null })
+        return this.world.addCategory({ id, name: data.name, userId: data.userId, parentId: data.parentId ?? null, color: data.color, icon: data.icon })
     }
 
     async findById(id: string): Promise<Category | null> {
@@ -140,7 +142,12 @@ export class InMemoryCategoryRepository implements CategoryRepository {
             parentId: data.parentId !== undefined ? data.parentId : category.parentId,
         }
         this.assertUnique(next)
-        Object.assign(category, { name: next.name, parentId: next.parentId })
+        Object.assign(category, {
+            name: next.name,
+            parentId: next.parentId,
+            ...(data.color !== undefined ? { color: data.color } : {}),
+            ...(data.icon !== undefined ? { icon: data.icon } : {}),
+        })
         return { ...category }
     }
 
@@ -177,6 +184,16 @@ export class InMemoryCategoryRepository implements CategoryRepository {
         const counts = new Map<string, number>()
         for (const t of this.world.transactions) {
             if (t.userId === userId && t.categoryId && t.deletedAt === null) {
+                counts.set(t.categoryId, (counts.get(t.categoryId) ?? 0) + 1)
+            }
+        }
+        return counts
+    }
+
+    async countLinkedTransactionsByCategoryId(userId: string): Promise<Map<string, number>> {
+        const counts = new Map<string, number>()
+        for (const t of this.world.transactions) {
+            if (t.userId === userId && t.categoryId) {
                 counts.set(t.categoryId, (counts.get(t.categoryId) ?? 0) + 1)
             }
         }
@@ -232,7 +249,15 @@ export class InMemoryCategoryRepository implements CategoryRepository {
     async restore(data: RestoreCategoryData): Promise<Category> {
         if (this.world.category(data.id)) throw new Error('P2002: Unique constraint failed on (id)')
         this.assertUnique({ id: data.id, userId: data.userId, parentId: data.parentId, name: data.name })
-        return this.world.addCategory({ id: data.id, name: data.name, userId: data.userId, parentId: data.parentId, createdAt: data.createdAt })
+        return this.world.addCategory({
+            id: data.id,
+            name: data.name,
+            userId: data.userId,
+            parentId: data.parentId,
+            createdAt: data.createdAt,
+            color: data.color,
+            icon: data.icon,
+        })
     }
 
     async deleteForUser(userId: string, id: string): Promise<boolean> {

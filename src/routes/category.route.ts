@@ -7,6 +7,9 @@ import { UpdateCategoryUseCase } from '@/application/use-cases/category-use-case
 import { DeleteCategoryUseCase } from '@/application/use-cases/category-use-case/delete-category.use-case'
 import { CategoryController } from '@/application/controllers/category-controller'
 import { ListCategoriesWithTransactionsUseCase } from '@/application/use-cases/category-use-case/list-categories-with-transactions.use-case'
+import { DeleteCategoryWithReassignmentUseCase } from '@/application/use-cases/category-use-case/delete-category-with-reassignment.use-case'
+import { CategoryStructureRollback } from '@/application/use-cases/mcp-write-use-case/category-structure-rollback'
+import { PrismaCategoryUnitOfWork } from '@/infra/repositories/prisma/prisma-category-unit-of-work'
 
 const categoryController = buildCategoryController()
 
@@ -16,6 +19,7 @@ export async function categoryRoutes(app: FastifyInstance) {
     app.get('/categories/with-transactions', (request, reply) => categoryController.listWithTransactions(request, reply))
     app.put('/categories/:id', (request, reply) => categoryController.update(request, reply))
     app.delete('/categories/:id', (request, reply) => categoryController.delete(request, reply))
+    app.post('/categories/operations/:operationId/rollback', (request, reply) => categoryController.rollbackOperation(request, reply))
 }
 
 function buildCategoryController(): CategoryController {
@@ -27,12 +31,17 @@ function buildCategoryController(): CategoryController {
     const listCategoriesWithTransactionsUseCase = new ListCategoriesWithTransactionsUseCase(categoryRepository, transactionRepository)
     const updateCategoryUseCase = new UpdateCategoryUseCase(categoryRepository)
     const deleteCategoryUseCase = new DeleteCategoryUseCase(categoryRepository)
+    const categoryUnitOfWork = new PrismaCategoryUnitOfWork()
+    const deleteCategoryWithReassignmentUseCase = new DeleteCategoryWithReassignmentUseCase(categoryUnitOfWork)
+    const categoryStructureRollback = new CategoryStructureRollback(categoryUnitOfWork)
 
     return new CategoryController(
         createCategoryUseCase,
         listCategoriesUseCase,
         listCategoriesWithTransactionsUseCase,
         updateCategoryUseCase,
-        deleteCategoryUseCase
+        deleteCategoryUseCase,
+        deleteCategoryWithReassignmentUseCase,
+        categoryStructureRollback
     )
 }

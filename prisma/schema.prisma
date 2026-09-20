@@ -183,6 +183,8 @@ model Category {
   children     Category[]    @relation("CategoryHierarchy")
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  color        String?
+  icon         String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 

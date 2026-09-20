@@ -10,6 +10,8 @@ function makeCategory(overrides: Partial<Category>): Category {
         name: 'name',
         userId: 'user-1',
         parentId: null,
+        color: null,
+        icon: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         ...overrides,

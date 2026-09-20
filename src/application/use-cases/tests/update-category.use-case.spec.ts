@@ -9,6 +9,8 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
         name: 'Category',
         userId: 'user-1',
         parentId: null,
+        color: null,
+        icon: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         ...overrides,
@@ -211,5 +213,29 @@ describe('UpdateCategoryUseCase', () => {
 
         vi.mocked(categoryRepository.findById).mockResolvedValue(makeCategory({ userId: 'other-user' }))
         await expect(sut.execute({ id: 'cat-1', userId: 'user-1', name: 'X' })).rejects.toThrow('Unauthorized')
+    })
+
+    it('should change only color/icon when the name stays the same (no false duplicate against itself)', async () => {
+        vi.mocked(categoryRepository.findById).mockResolvedValue(makeCategory({ id: 'cat-1', name: 'Pet' }))
+        // existsByName acha a própria categoria; como o nome não mudou, não é duplicado
+        vi.mocked(categoryRepository.existsByName).mockResolvedValue(true)
+        vi.mocked(categoryRepository.update).mockResolvedValue(makeCategory({ id: 'cat-1', name: 'Pet', color: 'rose', icon: 'paw-print' }))
+
+        const result = await sut.execute({ id: 'cat-1', userId: 'user-1', name: 'Pet', color: 'rose', icon: 'paw-print' })
+
+        expect(categoryRepository.update).toHaveBeenCalledWith('cat-1', { name: 'Pet', color: 'rose', icon: 'paw-print' })
+        expect(result).toMatchObject({ color: 'rose', icon: 'paw-print' })
+    })
+
+    it('should clear color/icon when null is sent and leave them alone when omitted', async () => {
+        vi.mocked(categoryRepository.findById).mockResolvedValue(makeCategory({ id: 'cat-1', name: 'Pet', color: 'rose' }))
+        vi.mocked(categoryRepository.existsByName).mockResolvedValue(false)
+        vi.mocked(categoryRepository.update).mockResolvedValue(makeCategory({ id: 'cat-1', name: 'Pet' }))
+
+        await sut.execute({ id: 'cat-1', userId: 'user-1', name: 'Pet', color: null })
+        expect(categoryRepository.update).toHaveBeenLastCalledWith('cat-1', { name: 'Pet', color: null })
+
+        await sut.execute({ id: 'cat-1', userId: 'user-1', name: 'Pet' })
+        expect(categoryRepository.update).toHaveBeenLastCalledWith('cat-1', { name: 'Pet' })
     })
 })

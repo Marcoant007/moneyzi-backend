@@ -21,14 +21,26 @@ export interface CategorySnapshot {
     parentId: string | null
     /** ISO 8601 — JSON não tem Date. */
     createdAt: string
+    /** Só presentes quando a categoria tinha cor/ícone — auditorias antigas não têm as chaves. */
+    color?: string
+    icon?: string
 }
 
-export function snapshotCategory(category: { id: string; name: string; parentId: string | null; createdAt: Date }): CategorySnapshot {
+export function snapshotCategory(category: {
+    id: string
+    name: string
+    parentId: string | null
+    createdAt: Date
+    color?: string | null
+    icon?: string | null
+}): CategorySnapshot {
     return {
         id: category.id,
         name: category.name,
         parentId: category.parentId,
         createdAt: category.createdAt.toISOString(),
+        ...(category.color ? { color: category.color } : {}),
+        ...(category.icon ? { icon: category.icon } : {}),
     }
 }
 

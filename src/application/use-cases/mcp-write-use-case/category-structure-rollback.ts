@@ -250,6 +250,8 @@ export class CategoryStructureRollback {
             name: snapshot.name,
             parentId: snapshot.parentId,
             createdAt: new Date(snapshot.createdAt),
+            color: snapshot.color ?? null,
+            icon: snapshot.icon ?? null,
         })
     }
 }

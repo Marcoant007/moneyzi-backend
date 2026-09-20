@@ -127,6 +127,16 @@ export class PrismaCategoryRepository implements CategoryRepository {
         return new Map(groups.filter((g) => g.categoryId).map((g) => [g.categoryId as string, g._count._all]))
     }
 
+    async countLinkedTransactionsByCategoryId(userId: string): Promise<Map<string, number>> {
+        const groups = await this.client.transaction.groupBy({
+            by: ['categoryId'],
+            where: { userId, categoryId: { not: null } },
+            _count: { _all: true },
+        })
+
+        return new Map(groups.filter((g) => g.categoryId).map((g) => [g.categoryId as string, g._count._all]))
+    }
+
     async listTransactionRefs(userId: string, categoryId: string): Promise<CategoryTransactionRef[]> {
         // Sem filtro de deletedAt de propósito: o FK Transaction.categoryId é
         // ON DELETE SET NULL, então apagar a categoria zeraria as soft-deleted
@@ -193,6 +203,8 @@ export class PrismaCategoryRepository implements CategoryRepository {
                 name: data.name,
                 parentId: data.parentId,
                 createdAt: data.createdAt,
+                color: data.color ?? null,
+                icon: data.icon ?? null,
             },
         })
     }

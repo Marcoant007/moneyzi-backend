@@ -118,7 +118,26 @@ describe('PrismaCategoryRepository — reorganization methods', () => {
         await new PrismaCategoryRepository(client as any).restore({ id: 'cat-1', userId: 'user-1', name: 'Aluguel Base ', parentId: 'p', createdAt })
 
         expect(client.category.create).toHaveBeenCalledWith({
-            data: { id: 'cat-1', userId: 'user-1', name: 'Aluguel Base ', parentId: 'p', createdAt },
+            data: { id: 'cat-1', userId: 'user-1', name: 'Aluguel Base ', parentId: 'p', createdAt, color: null, icon: null },
+        })
+    })
+
+    it('restore also brings back the color and icon the category had', async () => {
+        const client = fakeClient()
+        const createdAt = new Date('2026-01-15T08:00:00.000Z')
+
+        await new PrismaCategoryRepository(client as any).restore({
+            id: 'cat-1',
+            userId: 'user-1',
+            name: 'Pet',
+            parentId: null,
+            createdAt,
+            color: 'sky',
+            icon: 'paw-print',
+        })
+
+        expect(client.category.create).toHaveBeenCalledWith({
+            data: { id: 'cat-1', userId: 'user-1', name: 'Pet', parentId: null, createdAt, color: 'sky', icon: 'paw-print' },
         })
     })
 

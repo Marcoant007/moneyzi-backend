@@ -4,11 +4,18 @@ export interface CreateCategoryData {
     name: string
     userId: string
     parentId?: string | null
+    /** Chave de paleta (ex.: "sky"); o backend só valida o formato, a lista de cores vive no frontend. */
+    color?: string | null
+    /** Chave de ícone (ex.: "utensils"). */
+    icon?: string | null
 }
 
 export interface UpdateCategoryData {
     name?: string
     parentId?: string | null
+    /** undefined = não mexe; null = limpa. */
+    color?: string | null
+    icon?: string | null
 }
 
 export interface RestoreCategoryData {
@@ -17,6 +24,8 @@ export interface RestoreCategoryData {
     name: string
     parentId: string | null
     createdAt: Date
+    color?: string | null
+    icon?: string | null
 }
 
 export interface CategoryTransactionRef {
@@ -38,6 +47,11 @@ export interface CategoryRepository {
     hasGrandchildren(id: string): Promise<boolean>
     /** Contagem direta (não somada com descendentes) de transações por categoria, pra todas as categorias do usuário de uma vez. */
     countTransactionsByCategoryId(userId: string): Promise<Map<string, number>>
+    /**
+     * Igual à anterior, mas INCLUI as soft-deleted — é o que a trava de exclusão enxerga
+     * (hasTransactions não filtra deletedAt). Serve pra UI saber se apagar vai exigir reatribuição.
+     */
+    countLinkedTransactionsByCategoryId(userId: string): Promise<Map<string, number>>
 
     // Reorganização de categorias (MCP). Todos escopados por userId e feitos pra
     // rodar dentro de uma CategoryUnitOfWork (o repositório então está ligado a

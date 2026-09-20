@@ -7,12 +7,15 @@ interface UpdateCategoryRequest {
     userId: string
     name: string
     parentId?: string | null
+    /** undefined = não mexe; null = limpa. */
+    color?: string | null
+    icon?: string | null
 }
 
 export class UpdateCategoryUseCase {
     constructor(private categoryRepository: CategoryRepository) { }
 
-    async execute({ id, userId, name, parentId }: UpdateCategoryRequest): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
+    async execute({ id, userId, name, parentId, color, icon }: UpdateCategoryRequest): Promise<{ id: string; name: string; parentId: string | null; color: string | null; icon: string | null; createdAt: Date }> {
         const category = await this.categoryRepository.findById(id)
 
         if (!category) {
@@ -43,12 +46,16 @@ export class UpdateCategoryUseCase {
         const updated = await this.categoryRepository.update(id, {
             name,
             ...(isReparenting ? { parentId } : {}),
+            ...(color !== undefined ? { color } : {}),
+            ...(icon !== undefined ? { icon } : {}),
         })
 
         return {
             id: updated.id,
             name: updated.name,
             parentId: updated.parentId,
+            color: updated.color ?? null,
+            icon: updated.icon ?? null,
             createdAt: updated.createdAt
         }
     }

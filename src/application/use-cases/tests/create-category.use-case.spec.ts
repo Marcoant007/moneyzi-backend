@@ -9,6 +9,8 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
         name: 'New Category',
         userId: 'user-1',
         parentId: null,
+        color: null,
+        icon: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         ...overrides,
@@ -122,5 +124,24 @@ describe('CreateCategoryUseCase', () => {
             userId: 'user-1',
             parentId: 'parent-3',
         })).rejects.toThrow('Profundidade máxima de categorias excedida (máximo de 3 níveis).')
+    })
+
+    it('should persist and return color/icon when provided', async () => {
+        vi.mocked(categoryRepository.existsByName).mockResolvedValue(false)
+        vi.mocked(categoryRepository.create).mockResolvedValue(makeCategory({ color: 'sky', icon: 'utensils' }))
+
+        const result = await sut.execute({ name: 'Mercado', userId: 'user-1', color: 'sky', icon: 'utensils' })
+
+        expect(categoryRepository.create).toHaveBeenCalledWith({ name: 'Mercado', userId: 'user-1', color: 'sky', icon: 'utensils' })
+        expect(result).toMatchObject({ color: 'sky', icon: 'utensils' })
+    })
+
+    it('should return null color/icon for a category created without them', async () => {
+        vi.mocked(categoryRepository.existsByName).mockResolvedValue(false)
+        vi.mocked(categoryRepository.create).mockResolvedValue(makeCategory())
+
+        const result = await sut.execute({ name: 'Plain', userId: 'user-1' })
+
+        expect(result).toMatchObject({ color: null, icon: null })
     })
 })

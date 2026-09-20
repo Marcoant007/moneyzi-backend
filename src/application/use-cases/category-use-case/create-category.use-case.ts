@@ -7,12 +7,14 @@ interface CreateCategoryRequest {
     name: string
     userId: string
     parentId?: string | null
+    color?: string | null
+    icon?: string | null
 }
 
 export class CreateCategoryUseCase {
     constructor(private categoryRepository: CategoryRepository) { }
 
-    async execute({ name, userId, parentId }: CreateCategoryRequest): Promise<{ id: string; name: string; parentId: string | null; createdAt: Date }> {
+    async execute({ name, userId, parentId, color, icon }: CreateCategoryRequest): Promise<{ id: string; name: string; parentId: string | null; color: string | null; icon: string | null; createdAt: Date }> {
         if (parentId) {
             const parent = await this.categoryRepository.findById(parentId)
 
@@ -40,12 +42,16 @@ export class CreateCategoryUseCase {
             name,
             userId,
             ...(parentId !== undefined ? { parentId } : {}),
+            ...(color !== undefined ? { color } : {}),
+            ...(icon !== undefined ? { icon } : {}),
         })
 
         return {
             id: category.id,
             name: category.name,
             parentId: category.parentId,
+            color: category.color ?? null,
+            icon: category.icon ?? null,
             createdAt: category.createdAt
         }
     }
