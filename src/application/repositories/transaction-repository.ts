@@ -38,11 +38,22 @@ export interface McpTransactionSnapshot {
     date: Date
     categoryId: string | null
     category: TransactionCategory
+    /** Nome da categoria atual: a personalizada se houver, senão o enum de sistema (mesmo critério do list_transactions). */
+    categoryName?: string
 }
 
 export interface McpTransactionFilter {
     nameContains?: string
+    /** OR entre os termos (case-insensitive). Combina com os demais campos por AND. */
+    nameContainsAny?: string[]
     currentCategoryId?: string
+    /** Categoria de sistema atual (categoryId null + esse enum) — é o que `system:<ENUM>` vira. */
+    currentSystemCategory?: TransactionCategory
+    paymentMethod?: TransactionPaymentMethod
+    type?: TransactionType
+    /** Inclusivos, sobre o valor como armazenado (despesas são positivas; créditos/descontos, negativos). */
+    amountMin?: number
+    amountMax?: number
     dateFrom?: Date
     dateTo?: Date
 }
@@ -126,4 +137,6 @@ export interface TransactionRepository {
     // MCP write tools (bulk category reclassification)
     findManyByFilter(userId: string, filter: McpTransactionFilter, limit: number): Promise<McpTransactionSnapshot[]>
     findManyByIdsWithCategory(ids: string[], userId: string): Promise<McpTransactionSnapshot[]>
+    /** Transações ativas por categoria de sistema (categoryId null agrupado pelo enum) — alimenta as categorias de sistema do list_categories. */
+    countBySystemCategory(userId: string): Promise<Map<TransactionCategory, number>>
 }

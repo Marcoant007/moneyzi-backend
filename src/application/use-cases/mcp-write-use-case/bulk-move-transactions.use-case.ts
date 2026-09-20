@@ -1,20 +1,30 @@
 import { randomBytes } from 'node:crypto'
-import type { TransactionCategory } from '@prisma/client'
+import type { TransactionCategory, TransactionPaymentMethod } from '@prisma/client'
 import { redis } from '@/infra/cache/redis'
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import type { McpAuditLogRepository } from '@/application/repositories/mcp-audit-log-repository'
 import type { McpTransactionFilter } from '@/application/repositories/transaction-repository'
 import type { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { UpdateMultipleTransactionsUseCase } from '@/application/use-cases/transaction-use-case/update-multiple-transactions.use-case'
+import { isSystemCategoryId, parseSystemCategoryId } from '@/utils/system-category'
 
 const MAX_TRANSACTIONS_PER_CALL = 500
 const CONFIRMATION_TTL_SECONDS = 600
+/** Quantas transações o dry-run lista uma a uma; o resto entra só na contagem (count). */
+const PREVIEW_DISPLAY_LIMIT = 50
 
 export interface BulkMoveTarget {
     transactionIds?: string[]
     filter?: {
         nameContains?: string
+        /** OR entre os termos (case-insensitive). Entre campos diferentes vale AND. */
+        nameContainsAny?: string[]
+        /** Id de uma categoria personalizada ou de sistema (`system:<ENUM>`, ver list_categories). */
         currentCategoryId?: string
+        paymentMethod?: TransactionPaymentMethod
+        type?: 'EXPENSE' | 'DEPOSIT'
+        amountMin?: number
+        amountMax?: number
         dateFrom?: string
         dateTo?: string
     }
@@ -34,11 +44,19 @@ export interface BulkMovePreviewItem {
     amount: number
     date: Date
     previousCategoryId: string | null
+    /** Categoria atual da transação: a personalizada, ou o enum de sistema (ex.: "SERVICES"). */
+    previousCategoryName: string
 }
 
 export interface BulkMoveDryRunResult {
+    /** As primeiras `previewLimit` transações afetadas; o total real está em `count`. */
     preview: BulkMovePreviewItem[]
+    /** Total de transações que serão afetadas (não só as listadas em `preview`). */
     count: number
+    previewLimit: number
+    previewTruncated: boolean
+    /** true quando `count` bateu o limite de 500 por chamada — pode haver mais; repita depois de confirmar. */
+    limitReached: boolean
     confirmationToken: string
     expiresInSeconds: number
 }
@@ -78,8 +96,18 @@ export class BulkMoveTransactionsUseCase {
         await redis.set(this.redisKey(confirmationToken), JSON.stringify(pending), 'EX', CONFIRMATION_TTL_SECONDS)
 
         return {
-            preview: targets.map((t) => ({ id: t.id, name: t.name, amount: t.amount, date: t.date, previousCategoryId: t.categoryId })),
+            preview: targets.slice(0, PREVIEW_DISPLAY_LIMIT).map((t) => ({
+                id: t.id,
+                name: t.name,
+                amount: t.amount,
+                date: t.date,
+                previousCategoryId: t.categoryId,
+                previousCategoryName: t.categoryName ?? t.category,
+            })),
             count: targets.length,
+            previewLimit: PREVIEW_DISPLAY_LIMIT,
+            previewTruncated: targets.length > PREVIEW_DISPLAY_LIMIT,
+            limitReached: targets.length >= MAX_TRANSACTIONS_PER_CALL,
             confirmationToken,
             expiresInSeconds: CONFIRMATION_TTL_SECONDS,
         }
@@ -105,6 +133,10 @@ export class BulkMoveTransactionsUseCase {
         if (pending.newCategoryId !== newCategoryId) {
             throw new Error('CONFIRMATION_MISMATCH: a categoria de destino é diferente da usada no dry-run — rode um novo dryRun.')
         }
+
+        // A categoria de destino pode ter sido apagada/mesclada entre o dry-run e a
+        // confirmação (merge_categories/delete_category) — erro claro em vez de FK.
+        await this.validateNewCategory(userId, newCategoryId)
 
         const currentTargets = await this.resolveTargets(userId, target)
         const currentIds = currentTargets.map((t) => t.id).sort()
@@ -144,6 +176,10 @@ export class BulkMoveTransactionsUseCase {
     }
 
     private async validateNewCategory(userId: string, newCategoryId: string): Promise<void> {
+        if (isSystemCategoryId(newCategoryId)) {
+            throw new Error('SYSTEM_CATEGORY: categorias de sistema (isSystem:true) não podem ser destino — escolha uma categoria personalizada (ver list_categories).')
+        }
+
         const category = await this.categoryRepository.findById(newCategoryId)
         if (!category || category.userId !== userId) {
             throw new Error('Categoria de destino não encontrada')
@@ -158,13 +194,45 @@ export class BulkMoveTransactionsUseCase {
             )
         }
 
+        return this.transactionRepository.findManyByFilter(userId, this.buildFilter(target.filter), MAX_TRANSACTIONS_PER_CALL)
+    }
+
+    private buildFilter(input: BulkMoveTarget['filter']): McpTransactionFilter {
         const filter: McpTransactionFilter = {
-            nameContains: target.filter?.nameContains,
-            currentCategoryId: target.filter?.currentCategoryId,
-            dateFrom: target.filter?.dateFrom ? new Date(target.filter.dateFrom) : undefined,
-            dateTo: target.filter?.dateTo ? new Date(target.filter.dateTo) : undefined,
+            nameContains: input?.nameContains,
+            dateFrom: input?.dateFrom ? new Date(input.dateFrom) : undefined,
+            dateTo: input?.dateTo ? new Date(input.dateTo) : undefined,
         }
 
-        return this.transactionRepository.findManyByFilter(userId, filter, MAX_TRANSACTIONS_PER_CALL)
+        if (input?.nameContainsAny) {
+            const terms = input.nameContainsAny.map((term) => term.trim()).filter((term) => term.length > 0)
+            if (terms.length === 0) {
+                throw new Error('nameContainsAny precisa de pelo menos um termo não vazio.')
+            }
+            filter.nameContainsAny = terms
+        }
+
+        if (input?.currentCategoryId) {
+            if (isSystemCategoryId(input.currentCategoryId)) {
+                const systemCategory = parseSystemCategoryId(input.currentCategoryId)
+                if (!systemCategory) {
+                    throw new Error(`Categoria de sistema desconhecida: "${input.currentCategoryId}" (ver list_categories, isSystem:true).`)
+                }
+                filter.currentSystemCategory = systemCategory
+            } else {
+                filter.currentCategoryId = input.currentCategoryId
+            }
+        }
+
+        if (input?.paymentMethod) filter.paymentMethod = input.paymentMethod
+        if (input?.type) filter.type = input.type
+
+        if (input?.amountMin !== undefined && input?.amountMax !== undefined && input.amountMin > input.amountMax) {
+            throw new Error('amountMin não pode ser maior que amountMax.')
+        }
+        if (input?.amountMin !== undefined) filter.amountMin = input.amountMin
+        if (input?.amountMax !== undefined) filter.amountMax = input.amountMax
+
+        return filter
     }
 }

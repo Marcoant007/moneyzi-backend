@@ -6,10 +6,16 @@ import type { GetPayablesReceivablesUseCase } from '@/application/use-cases/paya
 import type { ListAccountsUseCase } from '@/application/use-cases/account-use-case/list-accounts.use-case'
 import type { GetCategoryMonthMatrixUseCase, MatrixRow } from '@/application/use-cases/dashboard-use-case/get-category-month-matrix.use-case'
 import type { ListCategoriesUseCase } from '@/application/use-cases/category-use-case/list-categories.use-case'
+import type { ListSystemCategoriesUseCase } from '@/application/use-cases/category-use-case/list-system-categories.use-case'
 import type { CreateCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-category-for-mcp.use-case'
 import type { MoveTransactionCategoryUseCase } from '@/application/use-cases/mcp-write-use-case/move-transaction-category.use-case'
 import type { BulkMoveTransactionsUseCase, BulkMoveTarget } from '@/application/use-cases/mcp-write-use-case/bulk-move-transactions.use-case'
+import type { MergeCategoriesUseCase } from '@/application/use-cases/mcp-write-use-case/merge-categories.use-case'
+import type { RenameCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/rename-category-for-mcp.use-case'
+import type { MoveCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/move-category-for-mcp.use-case'
+import type { DeleteCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/delete-category-for-mcp.use-case'
 import type { RollbackOperationUseCase } from '@/application/use-cases/mcp-write-use-case/rollback-operation.use-case'
+import { toSystemCategoryId } from '@/utils/system-category'
 
 /**
  * Servidor pessoal: existe um único dono (MCP_OWNER_USER_ID), então cada tool
@@ -40,11 +46,18 @@ interface McpToolsDeps {
     listAccountsUseCase: ListAccountsUseCase
     getCategoryMonthMatrixUseCase: GetCategoryMonthMatrixUseCase
     listCategoriesUseCase: ListCategoriesUseCase
+    listSystemCategoriesUseCase: ListSystemCategoriesUseCase
     createCategoryForMcpUseCase: CreateCategoryForMcpUseCase
     moveTransactionCategoryUseCase: MoveTransactionCategoryUseCase
     bulkMoveTransactionsUseCase: BulkMoveTransactionsUseCase
+    mergeCategoriesUseCase: MergeCategoriesUseCase
+    renameCategoryForMcpUseCase: RenameCategoryForMcpUseCase
+    moveCategoryForMcpUseCase: MoveCategoryForMcpUseCase
+    deleteCategoryForMcpUseCase: DeleteCategoryForMcpUseCase
     rollbackOperationUseCase: RollbackOperationUseCase
 }
+
+const PAYMENT_METHODS = ['CREDIT_CARD', 'DEBIT_CARD', 'BANK_TRANSFER', 'BANK_SLIP', 'CASH', 'PIX', 'OTHER'] as const
 
 function rowToByMonth(row: MatrixRow, months: string[]) {
     return {
@@ -73,7 +86,7 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
         {
             name: 'list_transactions',
             description:
-                'Lista as transações (receitas e despesas) de um mês específico, com nome, categoria, valor, data e forma de pagamento.',
+                'Lista as transações (receitas e despesas) de um mês específico, com id, nome, categoria (nome e categoryId — o MESMO id de list_categories, inclusive "system:<NOME>" para categorias de sistema), valor, data e forma de pagamento. Use o id da transação para mover por lista explícita (move_transaction_category / bulk_move_transactions).',
             inputSchema: {
                 month: z.number().int().min(1).max(12).optional().describe('Mês (1-12). Se omitido, usa o mês atual.'),
                 year: z.number().int().min(2000).max(2100).optional().describe('Ano (ex: 2026). Se omitido, usa o ano atual.'),
@@ -97,10 +110,14 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
                 })
 
                 return transactions.map((t) => ({
+                    id: t.id,
                     name: t.name,
                     type: t.type,
                     amount: t.amount,
                     category: t.categoryRef?.name ?? t.category,
+                    // Casa com o id de list_categories: o da categoria personalizada,
+                    // ou o id sintético da categoria de sistema quando não há uma.
+                    categoryId: t.categoryId ?? toSystemCategoryId(t.category),
                     date: t.date,
                     paymentMethod: t.paymentMethod,
                     account: t.account?.name ?? null,
@@ -168,17 +185,24 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
         {
             name: 'list_categories',
             description:
-                'Retorna todas as categorias personalizadas do usuário, com id, nome, categoria pai (se subcategoria) e quantas transações usam cada uma. Use antes de criar ou mover categorias — é a fonte confiável de ids, já que as transações trazem o nome da categoria mas não um id garantido.',
+                'Retorna todas as categorias do usuário — as personalizadas (isSystem:false) e as de sistema (isSystem:true, ex.: SERVICES, SALARY, HOUSING, OTHER; id estável no formato "system:<NOME>") — com id, nome, categoria pai (se subcategoria) e quantas transações usam cada uma. Use antes de criar, mover, mesclar ou apagar categorias — é a fonte confiável de ids. As categorias de sistema servem como currentCategoryId em bulk_move_transactions, mas não podem ser renomeadas, movidas, mescladas nem apagadas.',
             inputSchema: {},
             execute: async () => {
-                const categories = await deps.listCategoriesUseCase.execute(userId)
+                const [categories, systemCategories] = await Promise.all([
+                    deps.listCategoriesUseCase.execute(userId),
+                    deps.listSystemCategoriesUseCase.execute(userId),
+                ])
                 return {
-                    categories: categories.map((c) => ({
-                        id: c.id,
-                        name: c.name,
-                        parentId: c.parentId,
-                        transactionCount: c.transactionCount,
-                    })),
+                    categories: [
+                        ...categories.map((c) => ({
+                            id: c.id,
+                            name: c.name,
+                            parentId: c.parentId,
+                            transactionCount: c.transactionCount,
+                            isSystem: false,
+                        })),
+                        ...systemCategories,
+                    ],
                 }
             },
         },
@@ -226,12 +250,17 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
         {
             name: 'bulk_move_transactions',
             description:
-                'Reclassifica VÁRIAS transações de uma vez pra outra categoria. ESTA FERRAMENTA EXIGE DUAS CHAMADAS: primeiro com dryRun (padrão true) pra revisar exatamente quais transações seriam afetadas e receber um confirmationToken; depois uma segunda chamada com dryRun:false e o MESMO confirmationToken pra executar de verdade. Nunca pule a etapa de revisão — uma chamada sem confirmationToken nunca altera nada. Se o conjunto de transações mudar entre as duas chamadas (ex: chegou uma transação nova), a confirmação é rejeitada e pede um novo dry-run. Limite de 500 transações por chamada. Requer token com escopo de escrita.',
+                'Reclassifica VÁRIAS transações de uma vez pra outra categoria. ESTA FERRAMENTA EXIGE DUAS CHAMADAS: primeiro com dryRun (padrão true) pra revisar exatamente quais transações seriam afetadas e receber um confirmationToken; depois uma segunda chamada com dryRun:false e o MESMO confirmationToken pra executar de verdade. Nunca pule a etapa de revisão — uma chamada sem confirmationToken nunca altera nada. O dry-run devolve o total de transações afetadas (count) e a lista das primeiras (id, nome, valor, data e categoria atual); se passar de previewLimit, só as primeiras são listadas, mas o total é sempre o count. Se o conjunto de transações mudar entre as duas chamadas (ex: chegou uma transação nova), a confirmação é rejeitada e pede um novo dry-run. Limite de 500 transações por chamada (limitReached:true avisa que pode haver mais). Entre campos diferentes do filter vale AND; nameContainsAny é OR entre os termos. Requer token com escopo de escrita.',
             inputSchema: {
-                transactionIds: z.array(z.string()).optional().describe('Lista explícita de ids de transação. Use isso OU filter, não os dois.'),
+                transactionIds: z.array(z.string()).optional().describe('Lista explícita de ids de transação (ver list_transactions). Use isso OU filter, não os dois.'),
                 filter: z.object({
                     nameContains: z.string().optional().describe('Filtra por transações cujo nome contém esse texto.'),
-                    currentCategoryId: z.string().optional().describe('Filtra por transações que estão atualmente nessa categoria.'),
+                    nameContainsAny: z.array(z.string().min(1)).min(1).max(20).optional().describe('Filtra por transações cujo nome contém QUALQUER um destes textos (OR, sem diferenciar maiúsculas/minúsculas).'),
+                    currentCategoryId: z.string().optional().describe('Filtra por transações que estão atualmente nessa categoria: id de categoria personalizada ou de sistema ("system:SERVICES" etc., ver list_categories).'),
+                    paymentMethod: z.enum(PAYMENT_METHODS).optional().describe('Filtra pela forma de pagamento.'),
+                    type: z.enum(['EXPENSE', 'DEPOSIT']).optional().describe('Filtra por despesa (EXPENSE) ou receita (DEPOSIT).'),
+                    amountMin: z.number().optional().describe('Valor mínimo, inclusive (como armazenado: despesas são positivas).'),
+                    amountMax: z.number().optional().describe('Valor máximo, inclusive (como armazenado: despesas são positivas).'),
                     dateFrom: z.string().optional().describe('Data inicial (YYYY-MM-DD), inclusive.'),
                     dateTo: z.string().optional().describe('Data final (YYYY-MM-DD), inclusive.'),
                 }).optional().describe('Filtro pra resolver quais transações afetar, alternativa a transactionIds.'),
@@ -244,7 +273,12 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
                     transactionIds: z.array(z.string()).optional(),
                     filter: z.object({
                         nameContains: z.string().optional(),
+                        nameContainsAny: z.array(z.string()).max(20).optional(),
                         currentCategoryId: z.string().optional(),
+                        paymentMethod: z.enum(PAYMENT_METHODS).optional(),
+                        type: z.enum(['EXPENSE', 'DEPOSIT']).optional(),
+                        amountMin: z.number().optional(),
+                        amountMax: z.number().optional(),
                         dateFrom: z.string().optional(),
                         dateTo: z.string().optional(),
                     }).optional(),
@@ -268,11 +302,88 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
             },
         },
         {
+            name: 'merge_categories',
+            description:
+                'Junta duas categorias personalizadas: move TODAS as transações da categoria de origem (sourceId) para a de destino (targetId), reaponta as subcategorias da origem para o destino e depois APAGA a origem — tudo numa única transação de banco. ESTA FERRAMENTA EXIGE DUAS CHAMADAS: primeiro com dryRun (padrão true) pra revisar exatamente o que seria afetado (total de transações, subcategorias reapontadas e conflitos de nome) e receber um confirmationToken; depois uma segunda chamada com dryRun:false e o MESMO confirmationToken pra executar de verdade. Nunca pule a etapa de revisão — uma chamada sem confirmationToken nunca altera nada. Se uma subcategoria da origem tiver o mesmo nome de uma subcategoria do destino, o dry-run lista o conflito (canExecute:false) e NÃO emite token: resolva antes com rename_category ou move_category. Se o conjunto afetado mudar entre as duas chamadas (ex: chegou uma transação nova), a confirmação é rejeitada e pede um novo dry-run. Recusa origem igual ao destino, destino dentro da origem (ciclo) e resultado com mais de 3 níveis de profundidade. A operação fica auditada e pode ser desfeita com rollback_operation (recria a origem com o MESMO id). Requer token com escopo de escrita.',
+            inputSchema: {
+                sourceId: z.string().describe('Id da categoria de origem — ela será APAGADA no final (ver list_categories).'),
+                targetId: z.string().describe('Id da categoria de destino — recebe as transações e subcategorias da origem (ver list_categories).'),
+                dryRun: z.boolean().optional().describe('true (padrão) só mostra o que seria afetado e gera um confirmationToken, sem alterar nada. false executa de verdade e exige confirmationToken.'),
+                confirmationToken: z.string().optional().describe('Token retornado pelo dry-run anterior. Obrigatório quando dryRun:false.'),
+            },
+            execute: async (args) => {
+                const parsed = z.object({
+                    sourceId: z.string(),
+                    targetId: z.string(),
+                    dryRun: z.boolean().optional(),
+                    confirmationToken: z.string().optional(),
+                }).parse(args)
+
+                const dryRun = parsed.dryRun ?? true
+
+                if (dryRun) {
+                    return deps.mergeCategoriesUseCase.dryRun(userId, parsed.sourceId, parsed.targetId)
+                }
+
+                if (!parsed.confirmationToken) {
+                    throw new Error('dryRun:false exige confirmationToken (retornado por uma chamada anterior com dryRun:true).')
+                }
+
+                return deps.mergeCategoriesUseCase.confirm(userId, parsed.confirmationToken, parsed.sourceId, parsed.targetId)
+            },
+        },
+        {
+            name: 'rename_category',
+            description:
+                'Renomeia uma categoria personalizada imediatamente (sem dry-run). Aplica trim no nome — categorias antigas com espaço no final ficam limpas. Rejeita se já existir outra categoria com o mesmo nome (sem diferenciar maiúsculas/minúsculas) sob o mesmo pai. Categorias de sistema (isSystem:true) não podem ser renomeadas. A mudança fica auditada e pode ser desfeita com rollback_operation usando o operationId retornado. Requer token com escopo de escrita.',
+            inputSchema: {
+                categoryId: z.string().describe('Id da categoria a renomear (ver list_categories).'),
+                newName: z.string().min(1).max(100).describe('Novo nome da categoria.'),
+            },
+            execute: async (args) => {
+                const parsed = z.object({ categoryId: z.string(), newName: z.string() }).parse(args)
+                return deps.renameCategoryForMcpUseCase.execute({
+                    userId,
+                    categoryId: parsed.categoryId,
+                    newName: parsed.newName,
+                })
+            },
+        },
+        {
+            name: 'move_category',
+            description:
+                'Move uma categoria personalizada (com todas as suas subcategorias) pra baixo de outra categoria imediatamente (sem dry-run), ou a transforma em categoria raiz com newParentId:null. Recusa se criaria um ciclo, se a árvore passaria de 3 níveis contando as subcategorias que vão junto, ou se já existir uma categoria com o mesmo nome sob o novo pai. A mudança fica auditada e pode ser desfeita com rollback_operation usando o operationId retornado. Requer token com escopo de escrita.',
+            inputSchema: {
+                categoryId: z.string().describe('Id da categoria a mover (ver list_categories).'),
+                newParentId: z.string().nullable().describe('Id da nova categoria pai, ou null pra transformar em categoria raiz. Obrigatório (passe null explicitamente pra raiz).'),
+            },
+            execute: async (args) => {
+                const parsed = z.object({ categoryId: z.string(), newParentId: z.string().nullable() }).parse(args)
+                return deps.moveCategoryForMcpUseCase.execute({
+                    userId,
+                    categoryId: parsed.categoryId,
+                    newParentId: parsed.newParentId,
+                })
+            },
+        },
+        {
+            name: 'delete_category',
+            description:
+                'Apaga uma categoria personalizada VAZIA imediatamente (sem dry-run): só funciona se ela não tiver nenhuma transação, nenhuma subcategoria e nenhuma outra referência. Se tiver, devolve um erro explicando o motivo e o que fazer — mover as transações/subcategorias (move_transaction_category, bulk_move_transactions, move_category) ou juntar tudo em outra categoria com merge_categories. A mudança fica auditada e pode ser desfeita com rollback_operation (recria a categoria com o MESMO id). Requer token com escopo de escrita.',
+            inputSchema: {
+                categoryId: z.string().describe('Id da categoria a apagar (ver list_categories).'),
+            },
+            execute: async (args) => {
+                const { categoryId } = z.object({ categoryId: z.string() }).parse(args)
+                return deps.deleteCategoryForMcpUseCase.execute({ userId, categoryId })
+            },
+        },
+        {
             name: 'rollback_operation',
             description:
-                'Reverte uma operação de escrita anterior (create_category, move_transaction_category ou bulk_move_transactions) usando o operationId retornado por ela, restaurando o estado anterior salvo em auditoria. Transações que foram alteradas manualmente de novo depois da operação original são puladas (nunca sobrescreve uma mudança posterior) e reportadas na resposta. Requer token com escopo de escrita.',
+                'Reverte uma operação de escrita anterior (create_category, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category) usando o operationId retornado por ela, restaurando o estado anterior salvo em auditoria. merge_categories e delete_category recriam a categoria apagada com o MESMO id (o merge também devolve as subcategorias e as transações que moveu). Transações e subcategorias que foram alteradas de novo depois da operação original são puladas (nunca sobrescreve uma mudança posterior) e reportadas na resposta. Se o estado atual impedir a restauração (categoria pai original apagada, nome já ocupado, profundidade), o rollback falha com o motivo e não altera nada. Requer token com escopo de escrita.',
             inputSchema: {
-                operationId: z.string().describe('Id da operação a reverter (retornado por create_category, move_transaction_category ou bulk_move_transactions).'),
+                operationId: z.string().describe('Id da operação a reverter (retornado por create_category, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category).'),
             },
             execute: async (args) => {
                 const { operationId } = z.object({ operationId: z.string() }).parse(args)

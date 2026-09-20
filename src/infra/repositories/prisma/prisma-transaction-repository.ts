@@ -595,7 +595,28 @@ export class PrismaTransactionRepository implements TransactionRepository {
         date: true,
         categoryId: true,
         category: true,
+        categoryRef: { select: { name: true } },
     } as const
+
+    private static toMcpSnapshot(t: {
+        id: string
+        name: string
+        amount: Prisma.Decimal
+        date: Date
+        categoryId: string | null
+        category: TransactionCategory
+        categoryRef: { name: string } | null
+    }): McpTransactionSnapshot {
+        return {
+            id: t.id,
+            name: t.name,
+            amount: Number(t.amount),
+            date: t.date,
+            categoryId: t.categoryId,
+            category: t.category,
+            categoryName: t.categoryRef?.name ?? t.category,
+        }
+    }
 
     async findManyByFilter(userId: string, filter: McpTransactionFilter, limit: number): Promise<McpTransactionSnapshot[]> {
         const where: Prisma.TransactionWhereInput = { userId, deletedAt: null }
@@ -603,8 +624,32 @@ export class PrismaTransactionRepository implements TransactionRepository {
         if (filter.nameContains) {
             where.name = { contains: filter.nameContains, mode: 'insensitive' }
         }
+        // OR entre os termos, mas AND com todos os outros campos (inclusive nameContains).
+        if (filter.nameContainsAny && filter.nameContainsAny.length > 0) {
+            where.AND = [
+                { OR: filter.nameContainsAny.map((term) => ({ name: { contains: term, mode: 'insensitive' as const } })) },
+            ]
+        }
         if (filter.currentCategoryId) {
             where.categoryId = filter.currentCategoryId
+        }
+        if (filter.currentSystemCategory) {
+            // Categoria de sistema = sem categoria personalizada + enum. Uma
+            // transação com categoryId e enum OTHER NÃO é "OTHER de sistema".
+            where.categoryId = null
+            where.category = filter.currentSystemCategory
+        }
+        if (filter.paymentMethod) {
+            where.paymentMethod = filter.paymentMethod
+        }
+        if (filter.type) {
+            where.type = filter.type
+        }
+        if (filter.amountMin !== undefined || filter.amountMax !== undefined) {
+            where.amount = {
+                ...(filter.amountMin !== undefined ? { gte: filter.amountMin } : {}),
+                ...(filter.amountMax !== undefined ? { lte: filter.amountMax } : {}),
+            }
         }
         if (filter.dateFrom || filter.dateTo) {
             where.date = {
@@ -620,7 +665,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
             take: limit,
         })
 
-        return transactions.map((t) => ({ ...t, amount: Number(t.amount) }))
+        return transactions.map(PrismaTransactionRepository.toMcpSnapshot)
     }
 
     async findManyByIdsWithCategory(ids: string[], userId: string): Promise<McpTransactionSnapshot[]> {
@@ -629,6 +674,16 @@ export class PrismaTransactionRepository implements TransactionRepository {
             select: PrismaTransactionRepository.mcpSnapshotSelect,
         })
 
-        return transactions.map((t) => ({ ...t, amount: Number(t.amount) }))
+        return transactions.map(PrismaTransactionRepository.toMcpSnapshot)
+    }
+
+    async countBySystemCategory(userId: string): Promise<Map<TransactionCategory, number>> {
+        const groups = await prisma.transaction.groupBy({
+            by: ['category'],
+            where: { userId, categoryId: null, deletedAt: null },
+            _count: { _all: true },
+        })
+
+        return new Map(groups.map((g) => [g.category, g._count._all]))
     }
 }

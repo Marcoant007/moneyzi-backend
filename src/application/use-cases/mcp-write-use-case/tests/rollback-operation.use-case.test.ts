@@ -96,5 +96,65 @@ describe('RollbackOperationUseCase', () => {
         expect(deps.transactionRepository.updateManyCategory).toHaveBeenCalledTimes(1)
         expect(result.skipped).toEqual([{ transactionId: 'tx-2', reason: 'Categoria foi alterada manualmente depois da operação original' }])
         expect(deps.mcpAuditLogRepository.markRolledBack).toHaveBeenCalledWith('op-2')
+        // contrato antigo: o resultado dessas operações não ganha campos das operações de estrutura
+        expect(result).toEqual({ operationId: 'op-2', tool: 'bulk_move_transactions', rolledBack: true, skipped: result.skipped })
+    })
+
+    describe('when the original category was deleted or merged after the move (FK would reject restoring it)', () => {
+        function buildBulkLog() {
+            return {
+                id: 'op-3', tool: 'bulk_move_transactions', rolledBackAt: null,
+                previousState: [
+                    { transactionId: 'tx-1', categoryId: 'cat-gone', category: 'OTHER' },
+                    { transactionId: 'tx-2', categoryId: 'cat-alive', category: 'OTHER' },
+                    { transactionId: 'tx-3', categoryId: null, category: 'FOOD' },
+                ],
+                newState: [
+                    { transactionId: 'tx-1', categoryId: 'cat-new', category: 'OTHER' },
+                    { transactionId: 'tx-2', categoryId: 'cat-new', category: 'OTHER' },
+                    { transactionId: 'tx-3', categoryId: 'cat-new', category: 'OTHER' },
+                ],
+            }
+        }
+
+        it('skips and reports those transactions instead of failing midway with a foreign-key error', async () => {
+            const deps = buildDeps()
+            deps.mcpAuditLogRepository.findByIdForUser.mockResolvedValue(buildBulkLog())
+            deps.transactionRepository.findManyByIdsWithCategory.mockResolvedValue([
+                { id: 'tx-1', categoryId: 'cat-new', category: 'OTHER' },
+                { id: 'tx-2', categoryId: 'cat-new', category: 'OTHER' },
+                { id: 'tx-3', categoryId: 'cat-new', category: 'OTHER' },
+            ])
+            const categoryRepository = { listByUserId: vi.fn().mockResolvedValue([{ id: 'cat-alive' }, { id: 'cat-new' }]) } as any
+
+            const useCase = new RollbackOperationUseCase(deps.mcpAuditLogRepository, deps.transactionRepository, deps.deleteCategoryUseCase, undefined, categoryRepository)
+            const result = await useCase.execute('user-1', 'op-3')
+
+            expect(result.skipped).toEqual([
+                { transactionId: 'tx-1', reason: 'A categoria original não existe mais (foi apagada ou mesclada depois da operação)' },
+            ])
+            // as outras duas voltam normalmente (uma pra categoria viva, outra pra "sem categoria")
+            expect(deps.transactionRepository.updateManyCategory).toHaveBeenCalledWith(['tx-2'], 'user-1', { categoryId: 'cat-alive', category: 'OTHER' })
+            expect(deps.transactionRepository.updateManyCategory).toHaveBeenCalledWith(['tx-3'], 'user-1', { categoryId: null, category: 'FOOD' })
+            expect(deps.transactionRepository.updateManyCategory).not.toHaveBeenCalledWith(expect.arrayContaining(['tx-1']), expect.anything(), expect.anything())
+            expect(deps.mcpAuditLogRepository.markRolledBack).toHaveBeenCalledWith('op-3')
+        })
+
+        it('does not even look up categories when no entry needs one', async () => {
+            const deps = buildDeps()
+            deps.mcpAuditLogRepository.findByIdForUser.mockResolvedValue({
+                id: 'op-4', tool: 'move_transaction_category', rolledBackAt: null,
+                previousState: [{ transactionId: 'tx-1', categoryId: null, category: 'FOOD' }],
+                newState: [{ transactionId: 'tx-1', categoryId: 'cat-new', category: 'OTHER' }],
+            })
+            deps.transactionRepository.findManyByIdsWithCategory.mockResolvedValue([{ id: 'tx-1', categoryId: 'cat-new', category: 'OTHER' }])
+            const categoryRepository = { listByUserId: vi.fn() } as any
+
+            const useCase = new RollbackOperationUseCase(deps.mcpAuditLogRepository, deps.transactionRepository, deps.deleteCategoryUseCase, undefined, categoryRepository)
+            await useCase.execute('user-1', 'op-4')
+
+            expect(categoryRepository.listByUserId).not.toHaveBeenCalled()
+            expect(deps.transactionRepository.updateManyCategory).toHaveBeenCalledWith(['tx-1'], 'user-1', { categoryId: null, category: 'FOOD' })
+        })
     })
 })
