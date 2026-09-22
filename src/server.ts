@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
 import fastifyCors from '@fastify/cors'
+import fastifyFormbody from '@fastify/formbody'
 import { importRoutes } from '@routes/import.route'
 import { categoryRoutes } from '@routes/category.route'
 import { reportRoutes } from '@routes/report.routes'
@@ -17,6 +18,8 @@ import { transactionRoutes } from '@routes/transaction.route'
 import { meRoutes } from '@routes/me.route'
 import { mcpRoutes } from '@routes/mcp.route'
 import { mcpTokenRoutes } from '@routes/mcp-token.route'
+import { oauthRoutes } from '@routes/oauth.route'
+import { oauthConsentRoutes } from '@routes/oauth-consent.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
@@ -29,15 +32,19 @@ async function bootstrap() {
         origin: process.env.FRONTEND_URL || '*',
         credentials: true
     })
+    // POST /oauth/token precisa aceitar application/x-www-form-urlencoded (RFC 6749 §4.1.3).
+    await app.register(fastifyFormbody)
 
     await app.register(cronRoutes)
     await app.register(userRoutes)
     await app.register(mcpRoutes)
+    await app.register(oauthRoutes)
 
     await app.register(async (protectedApp) => {
         await headerAuth(protectedApp)
 
         protectedApp.register(fastifyMultipart)
+        protectedApp.register(oauthConsentRoutes)
         protectedApp.register(importRoutes)
         protectedApp.register(categoryRoutes)
         protectedApp.register(reportRoutes)

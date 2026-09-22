@@ -24,7 +24,11 @@ function buildApp() {
 }
 
 function buildReply() {
-    return { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
+    return {
+        status: vi.fn().mockReturnThis(),
+        send: vi.fn().mockReturnThis(),
+        header: vi.fn().mockReturnThis(),
+    } as any
 }
 
 describe('mcpBearerAuth', () => {
@@ -44,6 +48,10 @@ describe('mcpBearerAuth', () => {
         await getHook()(req, reply)
 
         expect(reply.status).toHaveBeenCalledWith(401)
+        expect(reply.header).toHaveBeenCalledWith(
+            'WWW-Authenticate',
+            expect.stringContaining('resource_metadata='),
+        )
         expect(findActiveByTokenHashMock).not.toHaveBeenCalled()
     })
 
@@ -59,6 +67,10 @@ describe('mcpBearerAuth', () => {
         await getHook()(req, reply)
 
         expect(reply.status).toHaveBeenCalledWith(401)
+        expect(reply.header).toHaveBeenCalledWith(
+            'WWW-Authenticate',
+            expect.stringContaining('resource_metadata='),
+        )
         expect(findActiveByTokenHashMock).toHaveBeenCalledWith(hashMcpToken('unknown-or-revoked'))
     })
 

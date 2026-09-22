@@ -8,32 +8,32 @@ datasource db {
 }
 
 model Transaction {
-  id             String                     @id @default(uuid())
-  name           String
-  description    String?
-  type           TransactionType
-  amount         Decimal                    @db.Decimal(10, 2)
-  importJobId    String?
-  category       TransactionCategory
-  paymentMethod  TransactionPaymentMethod
-  date           DateTime
-  dueDate        DateTime?
-  isRecurring        Boolean                    @default(false)
-  recurrenceGroupId  String?
-  paymentStatus      PaymentStatus              @default(PENDING)
-  paidAt         DateTime?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
-  deletedAt      DateTime?
-  userId         String
-  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  categoryId     String?
-  categoryRef    Category?                  @relation(fields: [categoryId], references: [id])
-  creditCardId   String?
-  creditCard     CreditCard?                @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
-  accountId      String?
-  account        Account?                   @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  notifications  Notification[]
+  id                String                   @id @default(uuid())
+  name              String
+  description       String?
+  type              TransactionType
+  amount            Decimal                  @db.Decimal(10, 2)
+  importJobId       String?
+  category          TransactionCategory
+  paymentMethod     TransactionPaymentMethod
+  date              DateTime
+  dueDate           DateTime?
+  isRecurring       Boolean                  @default(false)
+  recurrenceGroupId String?
+  paymentStatus     PaymentStatus            @default(PENDING)
+  paidAt            DateTime?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  deletedAt         DateTime?
+  userId            String
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId        String?
+  categoryRef       Category?                @relation(fields: [categoryId], references: [id])
+  creditCardId      String?
+  creditCard        CreditCard?              @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+  accountId         String?
+  account           Account?                 @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  notifications     Notification[]
 
   @@index([userId])
   @@index([date])
@@ -128,21 +128,22 @@ enum TransactionPaymentMethod {
 }
 
 model User {
-  id                    String                  @id @default(uuid())
-  clerk_id              String?                 @unique
-  email                 String                  @unique
-  name                  String
-  createdAt             DateTime                @default(now())
-  termsAcceptedAt       DateTime?
-  transactions          Transaction[]
-  accounts              Account[]
-  categories            Category[]
-  notifications         Notification[]
-  creditCards           CreditCard[]
-  financialGoalSettings FinancialGoalSettings?
-  aiDeepAnalyses        AiDeepAnalysis[]
-  mcpTokens             McpToken[]
-  mcpAuditLogs          McpAuditLog[]
+  id                      String                   @id @default(uuid())
+  clerk_id                String?                  @unique
+  email                   String                   @unique
+  name                    String
+  createdAt               DateTime                 @default(now())
+  termsAcceptedAt         DateTime?
+  transactions            Transaction[]
+  accounts                Account[]
+  categories              Category[]
+  notifications           Notification[]
+  creditCards             CreditCard[]
+  financialGoalSettings   FinancialGoalSettings?
+  aiDeepAnalyses          AiDeepAnalysis[]
+  mcpTokens               McpToken[]
+  mcpAuditLogs            McpAuditLog[]
+  oauthAuthorizationCodes OAuthAuthorizationCode[]
 }
 
 model McpToken {
@@ -174,6 +175,46 @@ model McpAuditLog {
   @@index([userId])
 }
 
+/// Cliente OAuth registrado via DCR (RFC 7591) para falar com /mcp. Público
+/// (sem secret, token_endpoint_auth_method="none") — a confiança vem do PKCE
+/// mais o consentimento explícito do usuário dono do token, não do cliente.
+/// Sem userId: um client (ex. o conector do ChatGPT) é global, compartilhado
+/// por todos os usuários que autorizarem; o dono entra só no code.
+model OAuthClient {
+  id                      String   @id @default(uuid())
+  clientName              String?
+  redirectUris            String[]
+  tokenEndpointAuthMethod String   @default("none")
+  grantTypes              String[] @default(["authorization_code"])
+  responseTypes           String[] @default(["code"])
+  createdAt               DateTime @default(now())
+
+  authorizationCodes OAuthAuthorizationCode[]
+}
+
+/// Authorization code de uso único (RFC 6749 §4.1 + PKCE/RFC 7636). Vida
+/// curta (10min), hash-only-at-rest como o McpToken.tokenHash — nunca grava
+/// o code cru. `usedAt` é marcado atomicamente na troca pra impedir replay.
+model OAuthAuthorizationCode {
+  id                  String      @id @default(uuid())
+  codeHash            String      @unique
+  clientId            String
+  client              OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod String      @default("S256")
+  scope               String      @default("read")
+  createdAt           DateTime    @default(now())
+  expiresAt           DateTime
+  usedAt              DateTime?
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([expiresAt])
+}
+
 model Category {
   id           String        @id @default(uuid())
   name         String
@@ -200,18 +241,18 @@ enum ImportJobStatus {
 
 model CreditCard {
   id             String        @id @default(uuid())
-  name           String        
-  lastFourDigits String?       
-  brand          CardBrand?    
+  name           String
+  lastFourDigits String?
+  brand          CardBrand?
   limit          Decimal?      @db.Decimal(10, 2)
-  closingDay     Int?          
-  dueDay         Int?          
+  closingDay     Int?
+  dueDay         Int?
   color          String        @default("#3b82f6")
   bank           String?
   isActive       Boolean       @default(true)
   userId         String
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions   Transaction[] 
+  transactions   Transaction[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -220,20 +261,20 @@ model CreditCard {
 }
 
 model Account {
-  id             String      @id @default(uuid())
+  id             String        @id @default(uuid())
   name           String
-  type           AccountType @default(CHECKING)
-  initialBalance Decimal     @default(0) @db.Decimal(10, 2)
+  type           AccountType   @default(CHECKING)
+  initialBalance Decimal       @default(0) @db.Decimal(10, 2)
   color          String?
   icon           String?
-  isActive       Boolean     @default(true)
+  isActive       Boolean       @default(true)
   userId         String
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
-  transfersFrom  Transfer[]  @relation("TransferFrom")
-  transfersTo    Transfer[]  @relation("TransferTo")
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  transfersFrom  Transfer[]    @relation("TransferFrom")
+  transfersTo    Transfer[]    @relation("TransferTo")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([userId])
   @@index([userId, isActive])
@@ -332,15 +373,15 @@ enum IncomeStability {
 }
 
 model FinancialGoalSettings {
-  id                          String          @id @default(uuid())
-  userId                      String          @unique
-  user                        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  incomeStability              IncomeStability @default(STABLE)
-  reserveTargetOverride        Decimal?        @db.Decimal(10, 2)
-  reserveMonthlyContribution   Decimal?        @db.Decimal(10, 2)
-  onboardingCompletedAt        DateTime?
-  createdAt                    DateTime        @default(now())
-  updatedAt                    DateTime        @updatedAt
+  id                         String          @id @default(uuid())
+  userId                     String          @unique
+  user                       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomeStability            IncomeStability @default(STABLE)
+  reserveTargetOverride      Decimal?        @db.Decimal(10, 2)
+  reserveMonthlyContribution Decimal?        @db.Decimal(10, 2)
+  onboardingCompletedAt      DateTime?
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
 }
 
 model AiDeepAnalysis {

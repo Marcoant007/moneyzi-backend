@@ -27,6 +27,7 @@
   "packageManager": "pnpm@10.6.3",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "@fastify/formbody": "^9.0.0",
     "@fastify/multipart": "^9.0.3",
     "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/node": "^2.0.0",
