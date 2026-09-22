@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { RegisterOAuthClientUseCase, OAuthClientRegistrationError } from '@/application/use-cases/oauth-use-case/register-oauth-client.use-case'
 import { FindOAuthClientByIdUseCase } from '@/application/use-cases/oauth-use-case/find-oauth-client-by-id.use-case'
 import { ExchangeAuthorizationCodeUseCase, OAuthTokenExchangeError } from '@/application/use-cases/oauth-use-case/exchange-authorization-code.use-case'
+import { normalizeOAuthScope } from '@/utils/oauth.utils'
 
 const registerBodySchema = z.object({
     redirect_uris: z.array(z.string()).min(1),
@@ -28,11 +29,7 @@ const tokenBodySchema = z.object({
     code_verifier: z.string().min(1),
 })
 
-/**
- * Endpoints públicos do servidor OAuth (sem headerAuth — quem chama é o
- * próprio ChatGPT, não o Next.js). `/mcp` é o resource protegido; este
- * controller é o authorization server que emite os McpToken usados nele.
- */
+
 export class OAuthController {
     constructor(
         private readonly registerOAuthClientUseCase: RegisterOAuthClientUseCase,
@@ -40,7 +37,7 @@ export class OAuthController {
         private readonly exchangeAuthorizationCodeUseCase: ExchangeAuthorizationCodeUseCase,
         private readonly issuerUrl: string,
         private readonly frontendUrl: string,
-    ) {}
+    ) { }
 
     private get authorizationServerMetadata() {
         return {
@@ -104,11 +101,6 @@ export class OAuthController {
         }
         const query = parsedQuery.data
 
-        // client_id/redirect_uri validados ANTES de qualquer redirect: um redirect_uri
-        // não verificado vira open-redirector — a vulnerabilidade clássica de
-        // authorization endpoint. Só depois de confirmar que ele é confiável
-        // (está na lista registrada no DCR) é que erros de protocolo podem
-        // voltar via redirect (RFC 6749 §4.1.2.1).
         const client = await this.findOAuthClientByIdUseCase.execute(query.client_id)
         if (!client) {
             return reply.status(400).send({ error: 'invalid_request', error_description: 'unknown client_id' })
@@ -138,7 +130,7 @@ export class OAuthController {
         consentUrl.searchParams.set('redirect_uri', query.redirect_uri)
         consentUrl.searchParams.set('code_challenge', query.code_challenge)
         consentUrl.searchParams.set('code_challenge_method', query.code_challenge_method)
-        consentUrl.searchParams.set('scope', query.scope || 'read')
+        consentUrl.searchParams.set('scope', normalizeOAuthScope(query.scope))
         if (query.state) consentUrl.searchParams.set('state', query.state)
 
         return reply.redirect(consentUrl.toString(), 302)

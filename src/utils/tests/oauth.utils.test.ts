@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateOAuthClientId, generateAuthorizationCode, hashAuthorizationCode, verifyPkceS256 } from '@/utils/oauth.utils'
+import { generateOAuthClientId, generateAuthorizationCode, hashAuthorizationCode, verifyPkceS256, normalizeOAuthScope } from '@/utils/oauth.utils'
 
 describe('oauth.utils', () => {
     it('generateOAuthClientId returns a long random hex string, different every call', () => {
@@ -43,6 +43,29 @@ describe('oauth.utils', () => {
 
         it('rejects the correct verifier against a different challenge', () => {
             expect(verifyPkceS256(RFC_VERIFIER, 'some-other-challenge')).toBe(false)
+        })
+    })
+
+    describe('normalizeOAuthScope', () => {
+        it('collapses a space-separated scope list containing read_write down to read_write', () => {
+            expect(normalizeOAuthScope('read read_write')).toBe('read_write')
+            expect(normalizeOAuthScope('read_write read')).toBe('read_write')
+        })
+
+        it('returns read_write when it is the only token requested', () => {
+            expect(normalizeOAuthScope('read_write')).toBe('read_write')
+        })
+
+        it('returns read when only read was requested', () => {
+            expect(normalizeOAuthScope('read')).toBe('read')
+        })
+
+        it('defaults to read for missing, empty, or unrecognized scope', () => {
+            expect(normalizeOAuthScope(undefined)).toBe('read')
+            expect(normalizeOAuthScope(null)).toBe('read')
+            expect(normalizeOAuthScope('')).toBe('read')
+            expect(normalizeOAuthScope('   ')).toBe('read')
+            expect(normalizeOAuthScope('some_unknown_scope')).toBe('read')
         })
     })
 })

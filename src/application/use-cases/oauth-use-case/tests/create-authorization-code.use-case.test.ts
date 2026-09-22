@@ -108,4 +108,23 @@ describe('CreateAuthorizationCodeUseCase', () => {
         expect(ttlMs).toBeGreaterThan(9 * 60 * 1000)
         expect(callArg.expiresAt.getTime()).toBeLessThanOrEqual(after + 10 * 60 * 1000)
     })
+
+    it('normalizes a raw space-separated OAuth scope list before storing it (regression: write tools silently disappeared because McpToken.scope ended up as "read read_write", which never matches the exact "read_write" check in mcp-tools.ts)', async () => {
+        const clientRepository = buildClientRepository()
+        clientRepository.findById.mockResolvedValue(baseClient)
+        const codeRepository = buildCodeRepository()
+        codeRepository.create.mockImplementation(async (data: any) => ({ id: 'code-1', ...data }))
+        const useCase = new CreateAuthorizationCodeUseCase(clientRepository, codeRepository)
+
+        await useCase.execute({
+            userId: 'user-1',
+            clientId: 'client-1',
+            redirectUri: 'https://chatgpt.com/connector/oauth/abc',
+            codeChallenge: 'challenge-xyz',
+            codeChallengeMethod: 'S256',
+            scope: 'read read_write',
+        })
+
+        expect(codeRepository.create.mock.calls[0][0].scope).toBe('read_write')
+    })
 })

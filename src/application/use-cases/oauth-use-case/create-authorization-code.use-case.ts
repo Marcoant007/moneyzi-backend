@@ -1,6 +1,6 @@
 import type { OAuthClientRepository } from '@/application/repositories/oauth-client-repository'
 import type { OAuthAuthorizationCodeRepository } from '@/application/repositories/oauth-authorization-code-repository'
-import { generateAuthorizationCode, hashAuthorizationCode } from '@/utils/oauth.utils'
+import { generateAuthorizationCode, hashAuthorizationCode, normalizeOAuthScope } from '@/utils/oauth.utils'
 
 export class CreateAuthorizationCodeError extends Error {
     constructor(message: string) {
@@ -19,17 +19,11 @@ export interface CreateAuthorizationCodeInput {
     scope: string
 }
 
-/**
- * Materializa o code depois que o usuário aprova o consentimento na tela do
- * Next.js. Revalida client_id/redirect_uri contra o que está registrado —
- * nunca confia cegamente no que o frontend mandou, mesmo sendo uma chamada
- * interna autenticada (defesa em profundidade).
- */
 export class CreateAuthorizationCodeUseCase {
     constructor(
         private readonly oauthClientRepository: OAuthClientRepository,
         private readonly oauthAuthorizationCodeRepository: OAuthAuthorizationCodeRepository,
-    ) {}
+    ) { }
 
     async execute(input: CreateAuthorizationCodeInput): Promise<{ code: string }> {
         const client = await this.oauthClientRepository.findById(input.clientId)
@@ -55,7 +49,7 @@ export class CreateAuthorizationCodeUseCase {
             redirectUri: input.redirectUri,
             codeChallenge: input.codeChallenge,
             codeChallengeMethod: input.codeChallengeMethod,
-            scope: input.scope,
+            scope: normalizeOAuthScope(input.scope),
             expiresAt: new Date(Date.now() + CODE_TTL_MS),
         })
 
