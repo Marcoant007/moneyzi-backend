@@ -66,6 +66,7 @@ function buildTools(world: InMemoryWorld, userId: string, scope: string = 'read_
         listCategoriesUseCase: new ListCategoriesUseCase(categoryRepository, transactionRepository),
         listSystemCategoriesUseCase: new ListSystemCategoriesUseCase(transactionRepository),
         createCategoryForMcpUseCase: new CreateCategoryForMcpUseCase(categoryRepository, new CreateCategoryUseCase(categoryRepository), auditRepository),
+        createTransactionForMcpUseCase: unused,
         moveTransactionCategoryUseCase: new MoveTransactionCategoryUseCase(transactionRepository, categoryRepository, updateMultiple, auditRepository),
         bulkMoveTransactionsUseCase: new BulkMoveTransactionsUseCase(transactionRepository, categoryRepository, updateMultiple, auditRepository),
         mergeCategoriesUseCase: new MergeCategoriesUseCase(categoryRepository, unitOfWork),
@@ -361,13 +362,13 @@ describe('MCP category reorganization — write scope (over the real MCP wire pr
         expect(world.snapshot()).toEqual(before)
     })
 
-    it('a read_write token lists all 14 tools and can run the new ones through the protocol', async () => {
+    it('a read_write token lists all 15 tools and can run the new ones through the protocol', async () => {
         const world = seedMessyWorld()
         const tools = buildTools(world, USER_A, 'read_write')
 
         const listed = await rpc(tools, 'tools/list')
         const names = listed.result.tools.map((t: any) => t.name)
-        expect(names).toHaveLength(14)
+        expect(names).toHaveLength(15)
         for (const name of NEW_TOOLS) expect(names).toContain(name)
 
         const dry = await rpc(tools, 'tools/call', { name: 'merge_categories', arguments: { sourceId: 'iptu5', targetId: 'iptu6' } })

@@ -15,6 +15,8 @@ import { CreateCategoryUseCase } from '@/application/use-cases/category-use-case
 import { DeleteCategoryUseCase } from '@/application/use-cases/category-use-case/delete-category.use-case'
 import { UpdateMultipleTransactionsUseCase } from '@/application/use-cases/transaction-use-case/update-multiple-transactions.use-case'
 import { CreateCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-category-for-mcp.use-case'
+import { CreateTransactionForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-transaction-for-mcp.use-case'
+import { ValidateTransactionBalanceUseCase } from '@/application/use-cases/transaction-use-case/validate-transaction-balance.use-case'
 import { MoveTransactionCategoryUseCase } from '@/application/use-cases/mcp-write-use-case/move-transaction-category.use-case'
 import { BulkMoveTransactionsUseCase } from '@/application/use-cases/mcp-write-use-case/bulk-move-transactions.use-case'
 import { MergeCategoriesUseCase } from '@/application/use-cases/mcp-write-use-case/merge-categories.use-case'
@@ -54,6 +56,7 @@ export async function mcpRoutes(app: FastifyInstance) {
 
             const updateMultipleTransactionsUseCase = new UpdateMultipleTransactionsUseCase(transactionRepository)
             const categoryUnitOfWork = new PrismaCategoryUnitOfWork()
+            const validateTransactionBalanceUseCase = new ValidateTransactionBalanceUseCase(transactionRepository, accountRepository)
 
             const tools = buildMcpTools({
                 userId,
@@ -68,6 +71,12 @@ export async function mcpRoutes(app: FastifyInstance) {
                 createCategoryForMcpUseCase: new CreateCategoryForMcpUseCase(
                     categoryRepository,
                     new CreateCategoryUseCase(categoryRepository),
+                    mcpAuditLogRepository,
+                ),
+                createTransactionForMcpUseCase: new CreateTransactionForMcpUseCase(
+                    transactionRepository,
+                    categoryRepository,
+                    validateTransactionBalanceUseCase,
                     mcpAuditLogRepository,
                 ),
                 moveTransactionCategoryUseCase: new MoveTransactionCategoryUseCase(

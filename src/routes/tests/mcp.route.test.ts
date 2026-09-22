@@ -87,12 +87,12 @@ describe('POST /mcp — scope reaches the tool registry', () => {
         for (const name of NEW_TOOLS) expect(names).not.toContain(name)
     })
 
-    it('a read_write token sees all 14 tools, the four new ones included', async () => {
+    it('a read_write token sees all 15 tools, the four new ones included', async () => {
         const response = await rpc(app, 'write-token', 'tools/list')
         const names = parseBody(response.body).result.tools.map((t: any) => t.name)
 
-        expect(names).toHaveLength(14)
-        expect(names).toEqual(expect.arrayContaining(['create_category', 'move_transaction_category', 'bulk_move_transactions', 'rollback_operation', ...NEW_TOOLS]))
+        expect(names).toHaveLength(15)
+        expect(names).toEqual(expect.arrayContaining(['create_category', 'create_transaction', 'move_transaction_category', 'bulk_move_transactions', 'rollback_operation', ...NEW_TOOLS]))
     })
 
     it('a read token cannot call a new write tool by its exact name — and never reaches the database', async () => {

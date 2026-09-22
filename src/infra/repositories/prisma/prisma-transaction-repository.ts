@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { TransactionRepository, PayablesFilter, UpsertTransactionData, McpTransactionFilter, McpTransactionSnapshot } from '@/application/repositories/transaction-repository'
+import type { TransactionRepository, PayablesFilter, UpsertTransactionData, McpTransactionFilter, McpTransactionSnapshot, CreatedTransactionSnapshot } from '@/application/repositories/transaction-repository'
 import type { Prisma, TransactionCategory, TransactionType } from '@prisma/client'
 
 // Categorias que são consideradas fixas mesmo sem o flag isRecurring=true
@@ -15,8 +15,22 @@ const FIXED_ENUM_CATEGORIES: TransactionCategory[] = [
 ]
 
 export class PrismaTransactionRepository implements TransactionRepository {
-    async create(data: Prisma.TransactionUncheckedCreateInput): Promise<void> {
-        await prisma.transaction.create({ data })
+    async create(data: Prisma.TransactionUncheckedCreateInput): Promise<CreatedTransactionSnapshot> {
+        return prisma.transaction.create({
+            data,
+            select: {
+                id: true,
+                name: true,
+                amount: true,
+                type: true,
+                category: true,
+                categoryId: true,
+                paymentMethod: true,
+                date: true,
+                accountId: true,
+                creditCardId: true,
+            },
+        })
     }
 
     async findMany(userId: string, filters: { month: number; year: number; accountId?: string }) {

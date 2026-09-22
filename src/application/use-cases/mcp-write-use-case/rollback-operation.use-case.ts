@@ -70,6 +70,11 @@ export class RollbackOperationUseCase {
             await this.deleteCategoryUseCase.execute({ id: newState.id, userId })
         } else if (log.tool === 'move_transaction_category' || log.tool === 'bulk_move_transactions') {
             skipped = await this.rollbackTransactionMoves(userId, log.previousState as TransactionMoveEntry[], log.newState as TransactionMoveEntry[])
+        } else if (log.tool === 'create_transaction') {
+            // Desfazer uma criação é sempre apagar — mesma operação do botão
+            // "excluir transação" do app (DeleteTransactionUseCase -> hardDelete).
+            const newState = log.newState as { id: string }
+            await this.transactionRepository.hardDelete(newState.id, userId)
         } else {
             throw new Error(`Rollback não suportado para a ferramenta "${log.tool}"`)
         }

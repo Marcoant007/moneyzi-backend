@@ -75,8 +75,24 @@ export interface UpsertTransactionData {
     userId: string
 }
 
+export interface CreatedTransactionSnapshot {
+    id: string
+    name: string
+    amount: Decimal
+    type: TransactionType
+    category: TransactionCategory
+    categoryId: string | null
+    paymentMethod: TransactionPaymentMethod
+    date: Date
+    accountId: string | null
+    creditCardId: string | null
+}
+
 export interface TransactionRepository {
-    create(data: Prisma.TransactionUncheckedCreateInput): Promise<void>
+    /** Retorno amplo o bastante pro MCP (create_transaction) auditar/devolver o registro; os
+     * callers antigos (settle-payable, update-card-statement-amount, persist-transaction-handler)
+     * já ignoram o valor de retorno, então isso é compatível com eles sem nenhuma mudança. */
+    create(data: Prisma.TransactionUncheckedCreateInput): Promise<CreatedTransactionSnapshot>
     findMany(userId: string, filters: { month: number; year: number; accountId?: string }): Promise<TransactionListItem[]>
     countCurrentMonth(userId: string): Promise<number>
     upsert(data: UpsertTransactionData): Promise<void>

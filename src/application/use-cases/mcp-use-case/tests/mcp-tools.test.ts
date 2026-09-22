@@ -42,6 +42,20 @@ function buildDeps(scope: string = 'read_write') {
         moveCategoryForMcpUseCase: { execute: vi.fn().mockResolvedValue({ id: 'cat-1', changed: true, operationId: 'op-move' }) } as any,
         deleteCategoryForMcpUseCase: { execute: vi.fn().mockResolvedValue({ deletedCategoryId: 'cat-1', operationId: 'op-delete' }) } as any,
         createCategoryForMcpUseCase: { execute: vi.fn().mockResolvedValue({ id: 'cat-new', name: 'Nova', parentId: null, alreadyExisted: false, operationId: 'op-1' }) } as any,
+        createTransactionForMcpUseCase: {
+            execute: vi.fn().mockResolvedValue({
+                id: 'tx-new',
+                name: 'Compra',
+                amount: 50,
+                type: 'EXPENSE',
+                categoryId: 'cat-1',
+                paymentMethod: 'PIX',
+                date: new Date('2026-02-10'),
+                accountId: null,
+                creditCardId: null,
+                operationId: 'op-create-tx',
+            }),
+        } as any,
         moveTransactionCategoryUseCase: { execute: vi.fn().mockResolvedValue({ id: 'tx-1', name: 'Compra', previousCategoryId: null, newCategoryId: 'cat-1', operationId: 'op-2' }) } as any,
         bulkMoveTransactionsUseCase: {
             dryRun: vi.fn().mockResolvedValue({ preview: [], count: 0, confirmationToken: 'token-1', expiresInSeconds: 600 }),
@@ -200,6 +214,7 @@ describe('buildMcpTools', () => {
         const names = tools.map((t) => t.name)
 
         expect(names).not.toContain('create_category')
+        expect(names).not.toContain('create_transaction')
         expect(names).not.toContain('move_transaction_category')
         expect(names).not.toContain('bulk_move_transactions')
         expect(names).not.toContain('rollback_operation')
@@ -209,7 +224,7 @@ describe('buildMcpTools', () => {
         expect(names).toHaveLength(6)
     })
 
-    it('read_write tokens get all 6 read tools plus the 8 write tools', () => {
+    it('read_write tokens get all 6 read tools plus the 9 write tools', () => {
         const deps = buildDeps('read_write')
         const tools = buildMcpTools(deps)
         const names = tools.map((t) => t.name)
@@ -217,10 +232,10 @@ describe('buildMcpTools', () => {
         expect(names).toEqual(expect.arrayContaining([
             'get_monthly_summary', 'list_transactions', 'get_payables_receivables', 'get_accounts',
             'get_category_totals_by_month', 'list_categories',
-            'create_category', 'move_transaction_category', 'bulk_move_transactions', 'rollback_operation',
+            'create_category', 'create_transaction', 'move_transaction_category', 'bulk_move_transactions', 'rollback_operation',
             ...NEW_STRUCTURE_TOOLS,
         ]))
-        expect(names).toHaveLength(14)
+        expect(names).toHaveLength(15)
     })
 
     it('the two-call tools say so explicitly in their pt-BR description', () => {

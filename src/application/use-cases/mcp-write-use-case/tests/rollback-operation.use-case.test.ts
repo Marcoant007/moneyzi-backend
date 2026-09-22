@@ -10,6 +10,7 @@ function buildDeps() {
     const transactionRepository = {
         findManyByIdsWithCategory: vi.fn(),
         updateManyCategory: vi.fn(),
+        hardDelete: vi.fn(),
     } as any
     const categoryRepository = { findById: vi.fn(), hasChildren: vi.fn(), hasTransactions: vi.fn(), delete: vi.fn() } as any
     const deleteCategoryUseCase = new DeleteCategoryUseCase(categoryRepository)
@@ -98,6 +99,21 @@ describe('RollbackOperationUseCase', () => {
         expect(deps.mcpAuditLogRepository.markRolledBack).toHaveBeenCalledWith('op-2')
         // contrato antigo: o resultado dessas operações não ganha campos das operações de estrutura
         expect(result).toEqual({ operationId: 'op-2', tool: 'bulk_move_transactions', rolledBack: true, skipped: result.skipped })
+    })
+
+    it('rolls back create_transaction by hard-deleting the created transaction', async () => {
+        const deps = buildDeps()
+        deps.mcpAuditLogRepository.findByIdForUser.mockResolvedValue({
+            id: 'op-5', tool: 'create_transaction', rolledBackAt: null,
+            newState: { id: 'tx-new' },
+        })
+
+        const useCase = new RollbackOperationUseCase(deps.mcpAuditLogRepository, deps.transactionRepository, deps.deleteCategoryUseCase)
+        const result = await useCase.execute('user-1', 'op-5')
+
+        expect(deps.transactionRepository.hardDelete).toHaveBeenCalledWith('tx-new', 'user-1')
+        expect(deps.mcpAuditLogRepository.markRolledBack).toHaveBeenCalledWith('op-5')
+        expect(result).toEqual({ operationId: 'op-5', tool: 'create_transaction', rolledBack: true, skipped: [] })
     })
 
     describe('when the original category was deleted or merged after the move (FK would reject restoring it)', () => {

@@ -8,6 +8,7 @@ import type { GetCategoryMonthMatrixUseCase, MatrixRow } from '@/application/use
 import type { ListCategoriesUseCase } from '@/application/use-cases/category-use-case/list-categories.use-case'
 import type { ListSystemCategoriesUseCase } from '@/application/use-cases/category-use-case/list-system-categories.use-case'
 import type { CreateCategoryForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-category-for-mcp.use-case'
+import type { CreateTransactionForMcpUseCase } from '@/application/use-cases/mcp-write-use-case/create-transaction-for-mcp.use-case'
 import type { MoveTransactionCategoryUseCase } from '@/application/use-cases/mcp-write-use-case/move-transaction-category.use-case'
 import type { BulkMoveTransactionsUseCase, BulkMoveTarget } from '@/application/use-cases/mcp-write-use-case/bulk-move-transactions.use-case'
 import type { MergeCategoriesUseCase } from '@/application/use-cases/mcp-write-use-case/merge-categories.use-case'
@@ -48,6 +49,7 @@ interface McpToolsDeps {
     listCategoriesUseCase: ListCategoriesUseCase
     listSystemCategoriesUseCase: ListSystemCategoriesUseCase
     createCategoryForMcpUseCase: CreateCategoryForMcpUseCase
+    createTransactionForMcpUseCase: CreateTransactionForMcpUseCase
     moveTransactionCategoryUseCase: MoveTransactionCategoryUseCase
     bulkMoveTransactionsUseCase: BulkMoveTransactionsUseCase
     mergeCategoriesUseCase: MergeCategoriesUseCase
@@ -231,6 +233,51 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
             },
         },
         {
+            name: 'create_transaction',
+            description:
+                'Cria um lançamento (transação) novo. categoryId sempre tem que ser uma categoria PERSONALIZADA existente (ver list_categories; categorias de sistema, com id "system:X", não são aceitas — crie/reaproveite uma personalizada com create_category primeiro). Se paymentMethod for CREDIT_CARD, creditCardId também é obrigatório. Nada é inferido silenciosamente: se faltar categoria, cartão ou qualquer campo obrigatório, pergunte ao usuário em vez de adivinhar. A operação fica auditada e pode ser desfeita com rollback_operation usando o operationId retornado. Requer token com escopo de escrita.',
+            inputSchema: {
+                name: z.string().min(1).describe('Nome/descrição do lançamento.'),
+                amount: z.number().describe('Valor do lançamento. Despesas são positivas; só use negativo pra estorno/abatimento. Não pode ser zero.'),
+                type: z.enum(['DEPOSIT', 'EXPENSE', 'INVESTMENT']).describe('Receita (DEPOSIT), despesa (EXPENSE) ou investimento (INVESTMENT).'),
+                categoryId: z.string().describe('Id de uma categoria PERSONALIZADA (ver list_categories, ou crie uma nova com create_category). Categorias de sistema não são aceitas.'),
+                paymentMethod: z.enum(PAYMENT_METHODS).describe('Forma de pagamento.'),
+                date: z.string().describe('Data do lançamento (YYYY-MM-DD).'),
+                accountId: z.string().optional().describe('Conta associada (ver get_accounts). Opcional — se informada, o lançamento é validado contra o saldo da conta.'),
+                creditCardId: z.string().optional().describe('Cartão de crédito. Obrigatório quando paymentMethod é CREDIT_CARD.'),
+                dueDate: z.string().optional().describe('Data de vencimento (YYYY-MM-DD), se houver.'),
+                isRecurring: z.boolean().optional().describe('true se for um lançamento recorrente.'),
+            },
+            execute: async (args) => {
+                const parsed = z.object({
+                    name: z.string().min(1),
+                    amount: z.number(),
+                    type: z.enum(['DEPOSIT', 'EXPENSE', 'INVESTMENT']),
+                    categoryId: z.string(),
+                    paymentMethod: z.enum(PAYMENT_METHODS),
+                    date: z.coerce.date(),
+                    accountId: z.string().optional(),
+                    creditCardId: z.string().optional(),
+                    dueDate: z.coerce.date().optional(),
+                    isRecurring: z.boolean().optional(),
+                }).parse(args)
+
+                return deps.createTransactionForMcpUseCase.execute({
+                    userId,
+                    name: parsed.name,
+                    amount: parsed.amount,
+                    type: parsed.type,
+                    categoryId: parsed.categoryId,
+                    paymentMethod: parsed.paymentMethod,
+                    date: parsed.date,
+                    accountId: parsed.accountId ?? null,
+                    creditCardId: parsed.creditCardId ?? null,
+                    dueDate: parsed.dueDate ?? null,
+                    isRecurring: parsed.isRecurring ?? false,
+                })
+            },
+        },
+        {
             name: 'move_transaction_category',
             description:
                 'Reclassifica UMA transação pra outra categoria imediatamente (sem dry-run — pra várias transações de uma vez, use bulk_move_transactions). A mudança fica auditada e pode ser desfeita com rollback_operation usando o operationId retornado. Requer token com escopo de escrita.',
@@ -381,9 +428,9 @@ export function buildMcpTools(deps: McpToolsDeps): McpToolDefinition[] {
         {
             name: 'rollback_operation',
             description:
-                'Reverte uma operação de escrita anterior (create_category, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category) usando o operationId retornado por ela, restaurando o estado anterior salvo em auditoria. merge_categories e delete_category recriam a categoria apagada com o MESMO id (o merge também devolve as subcategorias e as transações que moveu). Transações e subcategorias que foram alteradas de novo depois da operação original são puladas (nunca sobrescreve uma mudança posterior) e reportadas na resposta. Se o estado atual impedir a restauração (categoria pai original apagada, nome já ocupado, profundidade), o rollback falha com o motivo e não altera nada. Requer token com escopo de escrita.',
+                'Reverte uma operação de escrita anterior (create_category, create_transaction, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category) usando o operationId retornado por ela, restaurando o estado anterior salvo em auditoria. create_transaction é revertido apagando a transação criada. merge_categories e delete_category recriam a categoria apagada com o MESMO id (o merge também devolve as subcategorias e as transações que moveu). Transações e subcategorias que foram alteradas de novo depois da operação original são puladas (nunca sobrescreve uma mudança posterior) e reportadas na resposta. Se o estado atual impedir a restauração (categoria pai original apagada, nome já ocupado, profundidade), o rollback falha com o motivo e não altera nada. Requer token com escopo de escrita.',
             inputSchema: {
-                operationId: z.string().describe('Id da operação a reverter (retornado por create_category, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category).'),
+                operationId: z.string().describe('Id da operação a reverter (retornado por create_category, create_transaction, move_transaction_category, bulk_move_transactions, merge_categories, rename_category, move_category ou delete_category).'),
             },
             execute: async (args) => {
                 const { operationId } = z.object({ operationId: z.string() }).parse(args)

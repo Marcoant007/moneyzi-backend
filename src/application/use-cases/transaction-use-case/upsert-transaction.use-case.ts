@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { TransactionRepository, UpsertTransactionData } from '@/application/repositories/transaction-repository'
 import type { AccountRepository } from '@/application/repositories/account-repository'
+import { ValidateTransactionBalanceUseCase } from './validate-transaction-balance.use-case'
 
 const upsertTransactionSchema = z.object({
     id: z.string().optional(),
@@ -23,44 +24,31 @@ const upsertTransactionSchema = z.object({
 type UpsertInput = z.infer<typeof upsertTransactionSchema>
 
 export class UpsertTransactionUseCase {
+    // Instanciado internamente (não injetado) pra manter o construtor público
+    // desta classe intacto — CreateTransactionForMcpUseCase recebe a sua
+    // própria instância de fora, mas o fluxo manual (transaction.route.ts) e
+    // os testes existentes continuam chamando `new UpsertTransactionUseCase(tx, acc)` sem mudar nada.
+    private readonly validateTransactionBalanceUseCase: ValidateTransactionBalanceUseCase
+
     constructor(
         private transactionRepository: TransactionRepository,
         private accountRepository: AccountRepository,
-    ) {}
+    ) {
+        this.validateTransactionBalanceUseCase = new ValidateTransactionBalanceUseCase(transactionRepository, accountRepository)
+    }
 
     async execute(input: UpsertInput): Promise<void> {
         const parsed = upsertTransactionSchema.parse(input)
 
         if (parsed.accountId && !parsed.id) {
-            await this.validateBalance(parsed)
+            await this.validateTransactionBalanceUseCase.execute({
+                userId: parsed.userId,
+                accountId: parsed.accountId,
+                type: parsed.type,
+                amount: parsed.amount,
+            })
         }
 
         await this.transactionRepository.upsert(parsed as UpsertTransactionData)
-    }
-
-    private async validateBalance(parsed: UpsertInput) {
-        const account = await this.accountRepository.findById(parsed.userId, parsed.accountId!)
-        if (!account) return
-
-        const grouped = await this.transactionRepository.groupAccountMovements(parsed.userId, parsed.accountId!)
-        const movement = grouped.reduce((sum, t) => {
-            const signal = t.type === 'EXPENSE' ? -1 : 1
-            return sum + Number(t._sum.amount || 0) * signal
-        }, 0)
-        const balance = Number(account.initialBalance || 0) + movement
-
-        if (parsed.type === 'EXPENSE' && parsed.amount > balance) {
-            throw new Error('INSUFFICIENT_BALANCE')
-        }
-
-        const isSavingsAccount = ['PIGGY_BANK', 'SAVINGS', 'INVESTMENT'].includes(account.type)
-        if (parsed.type === 'DEPOSIT' && isSavingsAccount) {
-            const allAccounts = await this.accountRepository.listByUserIdWithBalance(parsed.userId)
-            const totalBalance = allAccounts.reduce((sum, acc) => sum + acc.balance, 0)
-            const available = totalBalance - balance
-            if (parsed.amount > available) {
-                throw new Error('INSUFFICIENT_BALANCE')
-            }
-        }
     }
 }
