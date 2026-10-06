@@ -6,12 +6,15 @@ import logger from '@/lib/logger'
 
 let connection: amqp.ChannelModel | undefined
 let channel: amqp.Channel | undefined
+let reconnecting = false
+let consuming = false
 
 const importJobRepository = new PrismaImportJobRepository()
 
 const QUEUE_NAME = process.env.IMPORT_QUEUE_NAME || 'transaction_import'
 const DLQ_NAME = process.env.IMPORT_DLQ_NAME || `${QUEUE_NAME}.dlq`
 const RABBITMQ_URL = process.env.RABBITMQ_URL || ''
+const RECONNECT_DELAY_MS = 5000
 
 function getChannel(): amqp.Channel {
     if (!channel) {
@@ -38,6 +41,34 @@ async function publishToDlq(msg: amqp.ConsumeMessage, error: unknown) {
     })
 }
 
+// O broker pode derrubar a conexao a qualquer momento (restart, deploy, rede).
+// Sem isso, `channel` fica apontando pra um canal morto e toda publicacao/consumo
+// seguinte falha com "Channel closed" ate o processo do backend ser reiniciado.
+function handleConnectionDrop(reason: unknown) {
+    logger.error({ error: reason }, 'Conexao com RabbitMQ perdida; agendando reconexao')
+    connection = undefined
+    channel = undefined
+    scheduleReconnect()
+}
+
+function scheduleReconnect() {
+    if (reconnecting) return
+    reconnecting = true
+
+    setTimeout(async () => {
+        try {
+            await connectRabbitMQ()
+            if (consuming) {
+                await startConsumer()
+            }
+        } catch (err) {
+            logger.error({ error: err }, 'Falha ao reconectar ao RabbitMQ; tentando novamente')
+        } finally {
+            reconnecting = false
+        }
+    }, RECONNECT_DELAY_MS)
+}
+
 export async function connectRabbitMQ() {
     if (!RABBITMQ_URL) {
         throw new Error('RABBITMQ_URL environment variable is required')
@@ -51,6 +82,9 @@ export async function connectRabbitMQ() {
 
         connection = await amqp.connect(RABBITMQ_URL)
         channel = await connection.createChannel()
+
+        connection.on('error', (err) => handleConnectionDrop(err))
+        connection.on('close', (err) => handleConnectionDrop(err ?? 'connection closed'))
 
         // Respeita a topologia existente no broker sem mudar argumentos da fila principal.
         await channel.assertQueue(QUEUE_NAME, { durable: true })
@@ -86,6 +120,7 @@ async function finalizeJob(jobId: string | undefined, didFail: boolean) {
 }
 
 export async function startConsumer() {
+    consuming = true
     const activeChannel = getChannel()
 
     activeChannel.consume(QUEUE_NAME, async (msg) => {

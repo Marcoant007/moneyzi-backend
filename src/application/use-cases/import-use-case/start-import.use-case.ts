@@ -3,6 +3,7 @@ import { ImportJobDto } from '@/core/dtos/import-job.dto'
 import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
 import type { UserRepository } from '@/application/repositories/user-repository'
 import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
+import { ImportJobStatus } from '@prisma/client'
 
 export class StartImportUseCase {
     constructor(
@@ -68,6 +69,16 @@ export class StartImportUseCase {
             console.log('Import process started successfully')
         } catch (error) {
             console.error('Error starting import process:', error)
+
+            // Sem isso o job fica travado em PROCESSING para sempre quando o envio
+            // para a fila falha (ex.: conexao com RabbitMQ caida) antes de publicar
+            // qualquer mensagem.
+            try {
+                await this.importJobRepository.markStatus(job.id, ImportJobStatus.FAILED)
+            } catch (markError) {
+                console.error('Error marking import job as failed:', markError)
+            }
+
             throw new Error('Erro ao iniciar processamento: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
         }
 
