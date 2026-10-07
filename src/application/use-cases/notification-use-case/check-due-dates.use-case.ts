@@ -21,6 +21,8 @@ export class CheckDueDatesUseCase {
         const now = new Date()
         const threeDaysFromNow = new Date()
         threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3)
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
         let remindersSent = 0
         let overdueNotifications = 0
@@ -78,7 +80,7 @@ export class CheckDueDatesUseCase {
             console.log(`🔍 [USE CASE] Buscando transações vencidas...`)
 
             const overdueTransactions =
-                await this.transactionRepository.findOverdue(now)
+                await this.transactionRepository.findOverdue(thirtyDaysAgo, now)
 
             console.log(`📦 [USE CASE] Encontradas ${overdueTransactions.length} transações vencidas`)
 

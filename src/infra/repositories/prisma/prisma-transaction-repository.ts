@@ -355,6 +355,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
                     },
                     deletedAt: null,
                     type: 'EXPENSE',
+                    paymentStatus: 'PENDING',
                 },
                 include: {
                     user: true,
@@ -370,17 +371,23 @@ export class PrismaTransactionRepository implements TransactionRepository {
         }
     }
 
-    async findOverdue(currentDate: Date) {
+    // `since` limita o quão antiga uma conta vencida ainda conta como "vencida de
+    // verdade" para fins de notificação/email — sem isso, qualquer EXPENSE pendente
+    // de qualquer época do histórico (anos atrás) seria notificado todo dia.
+    async findOverdue(since: Date, currentDate: Date) {
         try {
-            console.log(`🔎 [REPOSITORY] Buscando transações vencidas antes de ${currentDate.toISOString()}`)
+            console.log(`🔎 [REPOSITORY] Buscando transações vencidas entre ${since.toISOString()} e ${currentDate.toISOString()}`)
 
             const transactions = await prisma.transaction.findMany({
                 where: {
                     dueDate: {
                         lt: currentDate,
+                        gte: since,
                     },
                     deletedAt: null,
                     type: 'EXPENSE',
+                    // Conta já paga não deve gerar aviso de atraso.
+                    paymentStatus: 'PENDING',
                 },
                 include: {
                     user: true,

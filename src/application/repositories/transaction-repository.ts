@@ -137,7 +137,7 @@ export interface TransactionRepository {
      */
     aggregateExpensesByType(range: { start: Date; end: Date; userId: string; isFixed: boolean }): Promise<{ _sum: { amount: Decimal | null } }>
     findUpcoming(startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date; user: { email: string; name: string } }>>
-    findOverdue(currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date; user: { email: string; name: string } }>>
+    findOverdue(since: Date, currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date; user: { email: string; name: string } }>>
     findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     findByCreditCardId(creditCardId: string, month: number, year: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
     findDashboardTransactions(
