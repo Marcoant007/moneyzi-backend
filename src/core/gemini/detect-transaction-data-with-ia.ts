@@ -109,70 +109,44 @@ ${categoryInstruction}`
 
     const fullPrompt = `Você é um classificador inteligente de transações bancárias.\n\n${prompt}`
 
-    const MAX_RETRIES = 4
-    const DEFAULT_RETRY_DELAY_MS = 60_000
+    try {
+        const result = await withTimeout(
+            model.generateContent(fullPrompt),
+            GEMINI_TIMEOUT_MS,
+        )
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const result = await withTimeout(
-                model.generateContent(fullPrompt),
-                GEMINI_TIMEOUT_MS,
-            )
+        const text = result.response.text()
+        const cleaned = text.trim().replace(/```json|```/g, '').trim()
+        const parsed = JSON.parse(cleaned)
 
-            const text = result.response.text()
-            const cleaned = text.trim().replace(/```json|```/g, '').trim()
-            const parsed = JSON.parse(cleaned)
+        const matchedCategoryId = parsed.userCategoryName
+            ? findCategoryId(parsed.userCategoryName)
+            : undefined
 
-            const matchedCategoryId = parsed.userCategoryName
-                ? findCategoryId(parsed.userCategoryName)
-                : undefined
+        const isValid =
+            VALID_TYPES.includes(parsed.type) &&
+            VALID_CATEGORY_ENUMS.includes(parsed.categoryEnum) &&
+            VALID_METHODS.includes(parsed.paymentMethod)
 
-            const isValid =
-                VALID_TYPES.includes(parsed.type) &&
-                VALID_CATEGORY_ENUMS.includes(parsed.categoryEnum) &&
-                VALID_METHODS.includes(parsed.paymentMethod)
-
-            if (!isValid) {
-                console.warn('Classificação inválida detectada:', parsed)
-                return fallbackClassification()
-            }
-
-            console.log('Classificação OK:', parsed)
-
-            return {
-                type: parsed.type,
-                category: parsed.categoryEnum,
-                paymentMethod: parsed.paymentMethod,
-                categoryId: matchedCategoryId,
-                categoryName: parsed.userCategoryName,
-            }
-        } catch (error: any) {
-            const is429 = error?.status === 429 || error?.statusText === 'Too Many Requests'
-
-            if (is429 && attempt < MAX_RETRIES) {
-                // Tenta extrair o retryDelay sugerido pelo Gemini (em segundos)
-                let delayMs = DEFAULT_RETRY_DELAY_MS
-                try {
-                    const retryInfo = error?.errorDetails?.find(
-                        (d: any) => d['@type']?.includes('RetryInfo')
-                    )
-                    if (retryInfo?.retryDelay) {
-                        const seconds = parseInt(String(retryInfo.retryDelay).replace('s', ''), 10)
-                        if (!isNaN(seconds)) delayMs = (seconds + 5) * 1000
-                    }
-                } catch {}
-
-                console.warn(
-                    `Gemini rate limit (429) na tentativa ${attempt + 1}/${MAX_RETRIES}. Aguardando ${delayMs / 1000}s...`
-                )
-                await new Promise((resolve) => setTimeout(resolve, delayMs))
-                continue
-            }
-
-            console.error('Erro ao classificar transação com IA:', error)
+        if (!isValid) {
+            console.warn('Classificação inválida detectada:', parsed)
             return fallbackClassification()
         }
-    }
 
-    return fallbackClassification()
+        console.log('Classificação OK:', parsed)
+
+        return {
+            type: parsed.type,
+            category: parsed.categoryEnum,
+            paymentMethod: parsed.paymentMethod,
+            categoryId: matchedCategoryId,
+            categoryName: parsed.userCategoryName,
+        }
+    } catch (error: any) {
+        // Cota do Gemini esgotada (429) ou qualquer outra falha: nao vale esperar o
+        // retryDelay sugerido pela API (pode passar de 1h) travando a transação. O
+        // usuário tem um MCP para recategorizar depois, entao cai direto no fallback.
+        console.error('Erro ao classificar transação com IA:', error)
+        return fallbackClassification()
+    }
 }

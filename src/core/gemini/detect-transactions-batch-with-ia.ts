@@ -12,7 +12,6 @@ const VALID_METHODS: TransactionPaymentMethod[] = [
 
 const BATCH_SIZE = 50
 const GEMINI_TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 30000)
-const DEFAULT_RETRY_DELAY_MS = 65_000
 
 export interface BatchTransactionInput {
     name: string
@@ -84,62 +83,43 @@ Formato de resposta — retorne SOMENTE o array JSON, sem texto adicional:
 Transações:
 ${lines.join('\n')}`
 
-    const MAX_RETRIES = 3
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const result = await withTimeout(model.generateContent(prompt), GEMINI_TIMEOUT_MS)
-            const text = result.response.text().trim().replace(/```json|```/g, '').trim()
-            const parsed: any[] = JSON.parse(text)
+    try {
+        const result = await withTimeout(model.generateContent(prompt), GEMINI_TIMEOUT_MS)
+        const text = result.response.text().trim().replace(/```json|```/g, '').trim()
+        const parsed: any[] = JSON.parse(text)
 
-            if (!Array.isArray(parsed) || parsed.length !== items.length) {
-                throw new BatchClassificationError(
-                    `Batch response length mismatch: expected ${items.length}, got ${Array.isArray(parsed) ? parsed.length : typeof parsed}`,
-                    false,
-                )
-            }
-
-            return parsed.map((p) => {
-                const isValid =
-                    VALID_TYPES.includes(p.type) &&
-                    VALID_CATEGORY_ENUMS.includes(p.categoryEnum) &&
-                    VALID_METHODS.includes(p.paymentMethod)
-
-                if (!isValid) return fallback()
-
-                return {
-                    type: p.type as TransactionType,
-                    category: p.categoryEnum as TransactionCategory,
-                    paymentMethod: p.paymentMethod as TransactionPaymentMethod,
-                    categoryName: p.userCategoryName ?? undefined,
-                }
-            })
-        } catch (error: any) {
-            if (error instanceof BatchClassificationError) throw error
-
-            const is429 = error?.status === 429 || error?.statusText === 'Too Many Requests'
-
-            if (is429 && attempt < MAX_RETRIES) {
-                let delayMs = DEFAULT_RETRY_DELAY_MS
-                try {
-                    const retryInfo = error?.errorDetails?.find(
-                        (d: any) => d['@type']?.includes('RetryInfo')
-                    )
-                    if (retryInfo?.retryDelay) {
-                        const seconds = parseInt(String(retryInfo.retryDelay).replace('s', ''), 10)
-                        if (!isNaN(seconds)) delayMs = (seconds + 5) * 1000
-                    }
-                } catch {}
-
-                console.warn(`Gemini batch rate limit (429), tentativa ${attempt + 1}/${MAX_RETRIES}. Aguardando ${delayMs / 1000}s...`)
-                await new Promise((r) => setTimeout(r, delayMs))
-                continue
-            }
-
-            throw new BatchClassificationError(error?.message ?? String(error), is429)
+        if (!Array.isArray(parsed) || parsed.length !== items.length) {
+            throw new BatchClassificationError(
+                `Batch response length mismatch: expected ${items.length}, got ${Array.isArray(parsed) ? parsed.length : typeof parsed}`,
+                false,
+            )
         }
-    }
 
-    throw new BatchClassificationError('Retries esgotados', false)
+        return parsed.map((p) => {
+            const isValid =
+                VALID_TYPES.includes(p.type) &&
+                VALID_CATEGORY_ENUMS.includes(p.categoryEnum) &&
+                VALID_METHODS.includes(p.paymentMethod)
+
+            if (!isValid) return fallback()
+
+            return {
+                type: p.type as TransactionType,
+                category: p.categoryEnum as TransactionCategory,
+                paymentMethod: p.paymentMethod as TransactionPaymentMethod,
+                categoryName: p.userCategoryName ?? undefined,
+            }
+        })
+    } catch (error: any) {
+        if (error instanceof BatchClassificationError) throw error
+
+        // Cota do Gemini esgotada: nao vale esperar o retryDelay sugerido pela API
+        // (pode passar de 1h) travando a importacao. O usuario tem um MCP para
+        // recategorizar depois, entao cai direto no fallback.
+        const is429 = error?.status === 429 || error?.statusText === 'Too Many Requests'
+
+        throw new BatchClassificationError(error?.message ?? String(error), is429)
+    }
 }
 
 // Classifica um lote e, se a chamada falhar por um motivo que dividir o lote pode
