@@ -1,6 +1,8 @@
 import { NotificationRepository } from '@/core/repositories/notification-repository'
 import { TransactionRepository } from '@/application/repositories/transaction-repository'
 import { NotificationType } from '@/core/entities/notification.entity'
+import { sendEmail } from '@/infra/email/resend-email-service'
+import { buildDueDateReminderEmail, buildOverdueEmail } from '@/infra/email/templates/due-date-email'
 
 interface CheckDueDatesResult {
     remindersSent: number
@@ -57,6 +59,17 @@ export class CheckDueDatesUseCase {
                         transactionId: transaction.id,
                     })
 
+                    if (transaction.user?.email) {
+                        const { subject, html } = buildDueDateReminderEmail({
+                            userName: transaction.user.name,
+                            transactionName: transaction.name,
+                            amount: transaction.amount.toString(),
+                            dueDate: transaction.dueDate,
+                            daysUntilDue,
+                        })
+                        await sendEmail({ to: transaction.user.email, subject, html })
+                    }
+
                     console.log(`✉️  [USE CASE] Lembrete criado: "${transaction.name}" vence em ${daysUntilDue} dia(s)`)
                     remindersSent++
                 }
@@ -91,6 +104,17 @@ export class CheckDueDatesUseCase {
                         message: `A conta "${transaction.name}" de R$ ${transaction.amount.toString()} venceu há ${daysOverdue} dia${daysOverdue > 1 ? 's' : ''}`,
                         transactionId: transaction.id,
                     })
+
+                    if (transaction.user?.email) {
+                        const { subject, html } = buildOverdueEmail({
+                            userName: transaction.user.name,
+                            transactionName: transaction.name,
+                            amount: transaction.amount.toString(),
+                            dueDate: transaction.dueDate,
+                            daysOverdue,
+                        })
+                        await sendEmail({ to: transaction.user.email, subject, html })
+                    }
 
                     console.log(`⚠️  [USE CASE] Notificação de atraso criada: "${transaction.name}" - ${daysOverdue} dia(s) em atraso`)
                     overdueNotifications++

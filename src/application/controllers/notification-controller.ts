@@ -2,7 +2,6 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import { ListNotificationsUseCase } from '@/application/use-cases/notification-use-case/list-notifications.use-case'
 import { MarkNotificationAsReadUseCase } from '@/application/use-cases/notification-use-case/mark-notification-as-read.use-case'
 import { MarkAllNotificationsAsReadUseCase } from '@/application/use-cases/notification-use-case/mark-all-notifications-as-read.use-case'
-import { CheckDueDatesUseCase } from '@/application/use-cases/notification-use-case/check-due-dates.use-case'
 import { prisma } from '@/lib/prisma'
 
 export class NotificationController {
@@ -10,7 +9,6 @@ export class NotificationController {
         private listNotificationsUseCase: ListNotificationsUseCase,
         private markNotificationAsReadUseCase: MarkNotificationAsReadUseCase,
         private markAllNotificationsAsReadUseCase: MarkAllNotificationsAsReadUseCase,
-        private checkDueDatesUseCase: CheckDueDatesUseCase,
     ) { }
 
     private async getDbUserIdFromClerkId(clerkId: string): Promise<string | null> {
@@ -107,28 +105,6 @@ export class NotificationController {
                 console.error(`💬 [NOTIFICATIONS] Mensagem: ${error.message}`)
             }
 
-            return reply.status(500).send({ error: 'Internal server error' })
-        }
-    }
-
-    async checkDueDates(request: FastifyRequest, reply: FastifyReply) {
-        try {
-            // Verificar authorization header
-            const authHeader = request.headers.authorization
-
-            if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-                return reply.status(401).send({ error: 'Unauthorized' })
-            }
-
-            const result = await this.checkDueDatesUseCase.execute()
-
-            return reply.status(200).send({
-                success: true,
-                ...result,
-                timestamp: new Date().toISOString(),
-            })
-        } catch (error) {
-            console.error('Error checking due dates:', error)
             return reply.status(500).send({ error: 'Internal server error' })
         }
     }

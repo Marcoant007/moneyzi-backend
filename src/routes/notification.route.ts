@@ -1,10 +1,8 @@
 import { FastifyInstance } from 'fastify'
 import { PrismaNotificationRepository } from '@/infra/repositories/prisma/prisma-notification-repository'
-import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { ListNotificationsUseCase } from '@/application/use-cases/notification-use-case/list-notifications.use-case'
 import { MarkNotificationAsReadUseCase } from '@/application/use-cases/notification-use-case/mark-notification-as-read.use-case'
 import { MarkAllNotificationsAsReadUseCase } from '@/application/use-cases/notification-use-case/mark-all-notifications-as-read.use-case'
-import { CheckDueDatesUseCase } from '@/application/use-cases/notification-use-case/check-due-dates.use-case'
 import { NotificationController } from '@/application/controllers/notification-controller'
 
 const notificationController = buildNotificationController()
@@ -23,7 +21,6 @@ export async function notificationRoutes(app: FastifyInstance) {
 
 function buildNotificationController(): NotificationController {
     const notificationRepository = new PrismaNotificationRepository()
-    const transactionRepository = new PrismaTransactionRepository()
 
     const listNotificationsUseCase = new ListNotificationsUseCase(
         notificationRepository,
@@ -33,15 +30,10 @@ function buildNotificationController(): NotificationController {
     )
     const markAllNotificationsAsReadUseCase =
         new MarkAllNotificationsAsReadUseCase(notificationRepository)
-    const checkDueDatesUseCase = new CheckDueDatesUseCase(
-        notificationRepository,
-        transactionRepository,
-    )
 
     return new NotificationController(
         listNotificationsUseCase,
         markNotificationAsReadUseCase,
         markAllNotificationsAsReadUseCase,
-        checkDueDatesUseCase,
     )
 }
