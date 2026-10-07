@@ -107,25 +107,20 @@ describe('detectTransactionsBatchWithIA', () => {
         expect(results[2].categoryId).toBeUndefined()
     })
 
-    it('falls back the whole batch on persistent 429 without splitting further (splitting would not help a quota error)', async () => {
+    it('falls back the whole batch immediately on 429, without waiting on Gemini\'s retryDelay (user recategorizes later via MCP)', async () => {
         const { detectTransactionsBatchWithIA } = await import('../detect-transactions-batch-with-ia')
 
         generateContentMock.mockRejectedValue({ status: 429, statusText: 'Too Many Requests' })
 
-        vi.useFakeTimers()
-
-        const promise = detectTransactionsBatchWithIA('user-1', [
+        const results = await detectTransactionsBatchWithIA('user-1', [
             { name: 'Padaria' },
             { name: 'Mercado' },
             { name: 'Farmácia' },
         ])
 
-        await vi.runAllTimersAsync()
-        const results = await promise
-
         expect(results).toHaveLength(3)
         expect(results.every((r) => r.category === 'OTHER' && r.type === 'EXPENSE')).toBe(true)
-        // MAX_RETRIES = 3 → 4 tentativas no total, para o lote inteiro (sem split adicional)
-        expect(generateContentMock).toHaveBeenCalledTimes(4)
+        // Sem retry/espera: uma única tentativa para o lote inteiro (sem split adicional)
+        expect(generateContentMock).toHaveBeenCalledTimes(1)
     })
 })
