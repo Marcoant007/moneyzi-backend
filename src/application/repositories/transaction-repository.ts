@@ -147,7 +147,7 @@ export interface TransactionRepository {
     // Payables & Receivables
     findPayables(userId: string, filters?: PayablesFilter): Promise<Array<Prisma.TransactionGetPayload<{ include: { creditCard: true } }>>>
     findReceivables(userId: string, filters?: PayablesFilter): Promise<Array<Prisma.TransactionGetPayload<{}>>>
-    markAsPaid(ids: string[], paidAt?: Date): Promise<void>
+    markAsPaid(ids: string[], options?: { paidAt?: Date; accountId?: string | null }): Promise<void>
     markAsPending(ids: string[]): Promise<void>
     findRecurringNextOccurrence(userId: string, name: string, month: number, year: number): Promise<{ id: string } | null>
     // MCP write tools (bulk category reclassification)

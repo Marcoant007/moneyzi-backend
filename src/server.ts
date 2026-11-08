@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { connectRabbitMQ, startConsumer } from '@/infra/queue/rabbitmq/rabbitmq'
+import { startQueueWithRetry } from '@/infra/queue/rabbitmq/rabbitmq'
 import fastifyMultipart from '@fastify/multipart'
 import fastifyCors from '@fastify/cors'
 import fastifyFormbody from '@fastify/formbody'
@@ -26,7 +26,6 @@ import logger from '@/lib/logger'
 
 async function bootstrap() {
     const app = Fastify()
-    let queueReady = false
 
     await app.register(fastifyCors, {
         origin: process.env.FRONTEND_URL || '*',
@@ -59,33 +58,19 @@ async function bootstrap() {
         protectedApp.register(mcpTokenRoutes)
     })
 
-    if (process.env.DISABLE_QUEUE === 'true') {
-        logger.warn('Queues disabled via DISABLE_QUEUE=true; skipping RabbitMQ connection')
-    } else {
-        try {
-            await connectRabbitMQ()
-            queueReady = true
-        } catch (err: any) {
-            logger.error('Failed to start server', err)
-            logger.warn('RabbitMQ unavailable, continuing without queue')
-        }
-    }
-
     const port = Number(process.env.PORT) || 3333
     const host = process.env.HOST || '0.0.0.0'
 
     app.listen({ port, host }).then(async () => {
         logger.info(`HTTP server running on http://${host}:${port}`)
 
-        if (!queueReady) {
+        if (process.env.DISABLE_QUEUE === 'true') {
+            logger.warn('Queues disabled via DISABLE_QUEUE=true; skipping RabbitMQ connection')
             return
         }
 
-        try {
-            await startConsumer()
-        } catch (err: any) {
-            logger.error('Failed to start queue consumer', err)
-        }
+        // Conecta e consome; se o broker estiver fora, segue tentando em background.
+        await startQueueWithRetry()
     }).catch((err) => {
         logger.error('Failed to start server', err)
         process.exit(1)

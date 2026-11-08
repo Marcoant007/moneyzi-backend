@@ -7,12 +7,16 @@ const mocks = vi.hoisted(() => ({
     findTransactions: vi.fn(),
     findFirstTransaction: vi.fn(),
     createTransaction: vi.fn(),
+    findFirstAccount: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
     prisma: {
         creditCard: {
             findUnique: mocks.findCard,
+        },
+        account: {
+            findFirst: mocks.findFirstAccount,
         },
         transaction: {
             findMany: mocks.findTransactions,
@@ -333,6 +337,62 @@ describe('SettlePayableUseCase', () => {
                     scope: 'TRANSACTION_GROUP',
                 }),
             ).rejects.toThrow('transactionIds is required for TRANSACTION_GROUP scope')
+        })
+    })
+
+    describe('source account (accountId)', () => {
+        it('links paid transactions to the chosen account', async () => {
+            mocks.findFirstTransaction
+                .mockResolvedValueOnce({ id: 'tx-1' })
+                .mockResolvedValueOnce({ id: 'tx-1', isRecurring: false })
+            mocks.findFirstAccount.mockResolvedValueOnce({ id: 'acc-1' })
+
+            await sut.execute({
+                userId: 'user-1',
+                mode: 'PAY',
+                scope: 'TRANSACTION',
+                transactionId: 'tx-1',
+                accountId: 'acc-1',
+            })
+
+            expect(mocks.findFirstAccount).toHaveBeenCalledWith({
+                where: { id: 'acc-1', userId: 'user-1' },
+                select: { id: true },
+            })
+            expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1'], { accountId: 'acc-1' })
+        })
+
+        it('unlinks the account when accountId is null', async () => {
+            mocks.findFirstTransaction
+                .mockResolvedValueOnce({ id: 'tx-1' })
+                .mockResolvedValueOnce({ id: 'tx-1', isRecurring: false })
+
+            await sut.execute({
+                userId: 'user-1',
+                mode: 'PAY',
+                scope: 'TRANSACTION',
+                transactionId: 'tx-1',
+                accountId: null,
+            })
+
+            expect(mocks.findFirstAccount).not.toHaveBeenCalled()
+            expect(transactionRepository.markAsPaid).toHaveBeenCalledWith(['tx-1'], { accountId: null })
+        })
+
+        it("rejects an account that does not belong to the user", async () => {
+            mocks.findFirstTransaction.mockResolvedValueOnce({ id: 'tx-1' })
+            mocks.findFirstAccount.mockResolvedValueOnce(null)
+
+            await expect(
+                sut.execute({
+                    userId: 'user-1',
+                    mode: 'PAY',
+                    scope: 'TRANSACTION',
+                    transactionId: 'tx-1',
+                    accountId: 'someone-else-acc',
+                }),
+            ).rejects.toThrow('Account not found')
+            expect(transactionRepository.markAsPaid).not.toHaveBeenCalled()
         })
     })
 })

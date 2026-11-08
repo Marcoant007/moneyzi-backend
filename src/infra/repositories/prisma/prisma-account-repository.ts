@@ -32,7 +32,8 @@ export class PrismaAccountRepository implements AccountRepository {
             }),
             prisma.transaction.groupBy({
                 by: ['accountId', 'type'],
-                where: { userId, accountId: { not: null }, deletedAt: null },
+                // Pendentes (contas a pagar/receber) só afetam o saldo quando quitadas.
+                where: { userId, accountId: { not: null }, deletedAt: null, paymentStatus: 'PAID' },
                 _sum: { amount: true },
             }),
             prisma.transfer.groupBy({

@@ -4,6 +4,7 @@ import type { ImportJobRepository } from '@/application/repositories/import-job-
 import type { UserRepository } from '@/application/repositories/user-repository'
 import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 import { ImportJobStatus } from '@prisma/client'
+import { isQueueReady, QueueUnavailableError } from '@/infra/queue/rabbitmq/rabbitmq'
 
 export class StartImportUseCase {
     constructor(
@@ -38,6 +39,12 @@ export class StartImportUseCase {
         } catch (error) {
             console.error('Error parsing file:', error)
             throw new Error('Erro ao processar arquivo: ' + (error instanceof Error ? error.message : 'Formato inválido'))
+        }
+
+        // Falha rápido: sem fila não adianta gastar minutos classificando com a IA
+        // pra só no fim descobrir que não dá pra publicar as transações.
+        if (!isQueueReady()) {
+            throw new QueueUnavailableError()
         }
 
         console.log('Creating import job for user:', userId)

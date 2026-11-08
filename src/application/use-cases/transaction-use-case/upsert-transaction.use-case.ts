@@ -40,7 +40,9 @@ export class UpsertTransactionUseCase {
     async execute(input: UpsertInput): Promise<void> {
         const parsed = upsertTransactionSchema.parse(input)
 
-        if (parsed.accountId && !parsed.id) {
+        // Pendentes não mexem no saldo até serem quitadas (o default do repo é PAID).
+        const willBePaid = (parsed.paymentStatus ?? 'PAID') === 'PAID'
+        if (parsed.accountId && !parsed.id && willBePaid) {
             await this.validateTransactionBalanceUseCase.execute({
                 userId: parsed.userId,
                 accountId: parsed.accountId,

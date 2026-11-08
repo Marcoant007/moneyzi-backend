@@ -17,6 +17,18 @@ export interface SettlePayableInput {
         creditCardId: string
         dueDate: string // ISO string
     }
+    // Só em PAY: conta de onde saiu (ou para onde entrou) o dinheiro.
+    // undefined = não mexe no vínculo atual; null = desvincula de qualquer conta;
+    // string = vincula todas as transações quitadas a essa conta. O saldo das
+    // contas só considera transações PAID, então o débito acontece aqui.
+    accountId?: string | null
+}
+
+export class AccountNotFoundError extends Error {
+    constructor() {
+        super('Account not found')
+        this.name = 'AccountNotFoundError'
+    }
 }
 
 export class SettlePayableUseCase {
@@ -30,7 +42,18 @@ export class SettlePayableUseCase {
         }
 
         if (input.mode === 'PAY') {
-            await this.transactionRepository.markAsPaid(ids)
+            if (input.accountId === undefined) {
+                await this.transactionRepository.markAsPaid(ids)
+            } else {
+                if (input.accountId !== null) {
+                    const account = await prisma.account.findFirst({
+                        where: { id: input.accountId, userId: input.userId },
+                        select: { id: true },
+                    })
+                    if (!account) throw new AccountNotFoundError()
+                }
+                await this.transactionRepository.markAsPaid(ids, { accountId: input.accountId })
+            }
 
             // Contas avulsas (TRANSACTION) e grupos de categoria (TRANSACTION_GROUP)
             // geram a próxima ocorrência das filhas recorrentes. maybeCreateNextOccurrence

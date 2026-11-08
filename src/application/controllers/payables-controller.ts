@@ -43,6 +43,7 @@ export class PayablesController {
                 transactionId?: string;
                 transactionIds?: string[];
                 card?: { creditCardId: string; dueDate: string };
+                accountId?: string | null;
             };
 
             const result = await this.settleUseCase.execute({
@@ -54,7 +55,8 @@ export class PayablesController {
             console.error('[PayablesController] Error settling payable:', error);
             if (error instanceof Error && (
                 error.message.includes('required') ||
-                error.message.includes('No transactions')
+                error.message.includes('No transactions') ||
+                error.message === 'Account not found'
             )) {
                 return reply.status(400).send({ error: error.message });
             }

@@ -9,6 +9,18 @@ vi.mock('@/service/import-service', () => ({
     },
 }))
 
+const queue = vi.hoisted(() => ({ ready: true }))
+
+vi.mock('@/infra/queue/rabbitmq/rabbitmq', () => ({
+    isQueueReady: () => queue.ready,
+    QueueUnavailableError: class QueueUnavailableError extends Error {
+        constructor() {
+            super('Canal do RabbitMQ nao inicializado.')
+            this.name = 'QueueUnavailableError'
+        }
+    },
+}))
+
 function makeJob() {
     return {
         id: 'job-1',
@@ -36,6 +48,7 @@ function makeRepositories() {
 describe('StartImportUseCase', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        queue.ready = true
         vi.mocked(ImportService.parseOnly).mockReturnValue([{ name: 'Padaria', amount: 12.5 }])
         vi.mocked(ImportService.import).mockResolvedValue(undefined as any)
     })
@@ -72,6 +85,19 @@ describe('StartImportUseCase', () => {
             undefined,
             'US',
         )
+    })
+
+    it('fails fast without creating a job or calling the AI when the queue is down', async () => {
+        queue.ready = false
+        const { userRepository, importJobRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository)
+
+        await expect(
+            sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('x') }),
+        ).rejects.toThrow('Canal do RabbitMQ nao inicializado.')
+
+        expect(importJobRepository.create).not.toHaveBeenCalled()
+        expect(ImportService.import).not.toHaveBeenCalled()
     })
 
     it('trims userId before looking up the user', async () => {

@@ -128,7 +128,8 @@ export class PrismaTransactionRepository implements TransactionRepository {
     async groupAccountMovements(userId: string, accountId: string) {
         return prisma.transaction.groupBy({
             by: ['type'],
-            where: { userId, accountId, deletedAt: null },
+            // Saldo de conta só considera o que foi efetivamente pago/recebido.
+            where: { userId, accountId, deletedAt: null, paymentStatus: 'PAID' },
             _sum: { amount: true },
         })
     }
@@ -136,7 +137,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
     async groupAllAccountsMovements(userId: string) {
         return prisma.transaction.groupBy({
             by: ['accountId', 'type'],
-            where: { userId, accountId: { not: null }, deletedAt: null },
+            where: { userId, accountId: { not: null }, deletedAt: null, paymentStatus: 'PAID' },
             _sum: { amount: true },
         })
     }
@@ -570,12 +571,13 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
-    async markAsPaid(ids: string[], paidAt?: Date): Promise<void> {
+    async markAsPaid(ids: string[], options?: { paidAt?: Date; accountId?: string | null }): Promise<void> {
         await prisma.transaction.updateMany({
             where: { id: { in: ids } },
             data: {
                 paymentStatus: 'PAID',
-                paidAt: paidAt ?? new Date(),
+                paidAt: options?.paidAt ?? new Date(),
+                ...(options?.accountId !== undefined ? { accountId: options.accountId } : {}),
             },
         })
     }

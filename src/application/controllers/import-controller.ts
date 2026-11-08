@@ -1,3 +1,4 @@
+import { QueueUnavailableError } from '@/infra/queue/rabbitmq/rabbitmq'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { StartImportUseCase } from '@/application/use-cases/import-use-case/start-import.use-case'
 import { GetImportJobStatusUseCase } from '@/application/use-cases/import-use-case/get-import-job-status.use-case'
@@ -47,6 +48,12 @@ export class ImportController {
             return reply.status(202).send({ message: 'Arquivo sendo processado', job })
         } catch (error) {
             request.log.error(error)
+
+            if (error instanceof QueueUnavailableError) {
+                return reply.status(503).send({
+                    error: 'O processamento de importações está temporariamente indisponível. Tente novamente em alguns minutos.',
+                })
+            }
 
             if (error instanceof Error) {
                 if (error.message === 'Usuário não encontrado') {

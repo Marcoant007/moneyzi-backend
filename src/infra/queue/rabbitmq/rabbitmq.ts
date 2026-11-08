@@ -15,10 +15,24 @@ const QUEUE_NAME = process.env.IMPORT_QUEUE_NAME || 'transaction_import'
 const DLQ_NAME = process.env.IMPORT_DLQ_NAME || `${QUEUE_NAME}.dlq`
 const RABBITMQ_URL = process.env.RABBITMQ_URL || ''
 const RECONNECT_DELAY_MS = 5000
+const MAX_RECONNECT_DELAY_MS = 60000
+let reconnectAttempt = 0
+
+export class QueueUnavailableError extends Error {
+    constructor() {
+        super('Canal do RabbitMQ nao inicializado.')
+        this.name = 'QueueUnavailableError'
+    }
+}
+
+/** true quando há canal ativo para publicar. */
+export function isQueueReady(): boolean {
+    return Boolean(channel)
+}
 
 function getChannel(): amqp.Channel {
     if (!channel) {
-        throw new Error('Canal do RabbitMQ nao inicializado.')
+        throw new QueueUnavailableError()
     }
 
     return channel
@@ -51,9 +65,14 @@ function handleConnectionDrop(reason: unknown) {
     scheduleReconnect()
 }
 
+// Tenta reconectar até conseguir, com backoff (5s, 10s, 20s... até 60s).
+// Antes, uma falha na reconexão encerrava as tentativas e o backend ficava sem
+// fila até ser reiniciado ("Canal do RabbitMQ nao inicializado" nos imports).
 function scheduleReconnect() {
     if (reconnecting) return
     reconnecting = true
+
+    const delay = Math.min(RECONNECT_DELAY_MS * 2 ** reconnectAttempt, MAX_RECONNECT_DELAY_MS)
 
     setTimeout(async () => {
         try {
@@ -61,12 +80,35 @@ function scheduleReconnect() {
             if (consuming) {
                 await startConsumer()
             }
-        } catch (err) {
-            logger.error({ error: err }, 'Falha ao reconectar ao RabbitMQ; tentando novamente')
-        } finally {
+            reconnectAttempt = 0
             reconnecting = false
+        } catch (err) {
+            reconnectAttempt++
+            logger.error(
+                { error: err, attempt: reconnectAttempt },
+                'Falha ao reconectar ao RabbitMQ; tentando novamente',
+            )
+            channel = undefined
+            reconnecting = false
+            scheduleReconnect()
         }
-    }, RECONNECT_DELAY_MS)
+    }, delay)
+}
+
+/**
+ * Conecta e inicia o consumidor. Se o broker estiver fora no boot, não desiste:
+ * agenda reconexões em background e liga o consumidor quando voltar.
+ */
+export async function startQueueWithRetry(): Promise<void> {
+    consuming = true
+    try {
+        await connectRabbitMQ()
+        await startConsumer()
+    } catch (err) {
+        logger.warn({ error: err }, 'RabbitMQ indisponivel no boot; reconectando em background')
+        channel = undefined
+        scheduleReconnect()
+    }
 }
 
 export async function connectRabbitMQ() {
@@ -80,19 +122,27 @@ export async function connectRabbitMQ() {
             'Conectando ao RabbitMQ...',
         )
 
-        connection = await amqp.connect(RABBITMQ_URL)
-        channel = await connection.createChannel()
-
-        connection.on('error', (err) => handleConnectionDrop(err))
-        connection.on('close', (err) => handleConnectionDrop(err ?? 'connection closed'))
+        const newConnection = await amqp.connect(RABBITMQ_URL)
+        const newChannel = await newConnection.createChannel()
 
         // Respeita a topologia existente no broker sem mudar argumentos da fila principal.
-        await channel.assertQueue(QUEUE_NAME, { durable: true })
-        await channel.assertQueue(DLQ_NAME, { durable: true })
+        await newChannel.assertQueue(QUEUE_NAME, { durable: true })
+        await newChannel.assertQueue(DLQ_NAME, { durable: true })
 
-        if (typeof channel.prefetch === 'function') {
-            channel.prefetch(1)
+        if (typeof newChannel.prefetch === 'function') {
+            newChannel.prefetch(1)
         }
+
+        // 'error' é sempre seguido de 'close'; tratar só o close evita agendar
+        // reconexão duas vezes. O listener de error fica pra não derrubar o processo.
+        newConnection.on('error', (err) => logger.error({ error: err }, 'Erro na conexao com RabbitMQ'))
+        newConnection.on('close', (err) => {
+            if (connection === newConnection) handleConnectionDrop(err ?? 'connection closed')
+        })
+
+        // Só publica o canal depois que as filas existem.
+        connection = newConnection
+        channel = newChannel
 
         logger.info(
             { queue: QUEUE_NAME, dlq: DLQ_NAME },
