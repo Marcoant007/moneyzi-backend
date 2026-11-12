@@ -1,6 +1,7 @@
 import type { PaymentStatus, TransactionType, TransactionPaymentMethod } from '@prisma/client'
 import type { TransactionRepository, PayablesFilter } from '@/application/repositories/transaction-repository'
 import { MoneyUtils } from '@/utils/money.utils'
+import { CardDueDateUtils } from '@/utils/card-due-date.utils'
 
 export type EffectiveStatus = 'PAID' | 'PENDING' | 'OVERDUE'
 
@@ -211,7 +212,7 @@ export class GetPayablesReceivablesUseCase {
         for (const transaction of cardTransactions) {
             if (!transaction.creditCardId) continue
 
-            const dueDate = this.resolveCardDueDate(
+            const dueDate = CardDueDateUtils.resolve(
                 transaction.dueDate,
                 transaction.date,
                 transaction.creditCard?.dueDay ?? null,
@@ -289,41 +290,6 @@ export class GetPayablesReceivablesUseCase {
         }
 
         return true
-    }
-
-    private resolveCardDueDate(
-        dueDate: Date | null,
-        transactionDate: Date,
-        dueDay: number | null,
-        closingDay: number | null,
-    ): Date | null {
-        if (dueDate) return dueDate
-        if (!dueDay) return null
-
-        return this.computeCardDueDate(transactionDate, dueDay, closingDay ?? undefined)
-    }
-
-    private computeCardDueDate(transactionDate: Date, dueDay: number, closingDay?: number): Date {
-        const year = transactionDate.getFullYear()
-        const month = transactionDate.getMonth()
-        const txDay = transactionDate.getDate()
-
-        // With a closing day the statement cycle is:
-        //   txDay <= closingDay → belongs to CURRENT statement → paid NEXT month (+1)
-        //   txDay >  closingDay → belongs to NEXT    statement → paid in 2 months  (+2)
-        // Without a closing day we use the dueDay itself as the cycle boundary.
-        const monthOffset = closingDay
-            ? (txDay > closingDay ? 2 : 1)
-            : (txDay > dueDay ? 1 : 0)
-
-        const dueYear = year + Math.floor((month + monthOffset) / 12)
-        const dueMonth = (month + monthOffset) % 12
-        const lastDay = new Date(dueYear, dueMonth + 1, 0).getDate()
-        const safeDueDay = Math.max(1, Math.min(dueDay, lastDay))
-
-        // Use noon (12:00) to avoid the date shifting back one day when
-        // the value is serialised to UTC and read back in UTC-3 (Brazil).
-        return new Date(dueYear, dueMonth, safeDueDay, 12, 0, 0, 0)
     }
 
     private computeTotals(items: Array<{ amount: number; effectiveStatus: EffectiveStatus }>): PayablesTotals {

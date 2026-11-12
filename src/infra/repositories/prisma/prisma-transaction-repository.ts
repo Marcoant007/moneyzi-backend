@@ -420,23 +420,31 @@ export class PrismaTransactionRepository implements TransactionRepository {
         })
     }
 
-    async findByCreditCardId(creditCardId: string, month: number, year: number) {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59);
+    // Candidatas à fatura de [start, end): as que já têm dueDate no mês, mais as
+    // sem dueDate compradas até 2 meses antes (o ciclo mais longo possível) —
+    // o use case resolve a fatura destas com CardDueDateUtils.
+    async findCardInvoiceCandidates(creditCardIds: string[], start: Date, end: Date) {
+        if (creditCardIds.length === 0) return []
+        const twoMonthsBack = new Date(start.getFullYear(), start.getMonth() - 2, 1)
 
         return prisma.transaction.findMany({
             where: {
-                creditCardId,
+                creditCardId: { in: creditCardIds },
                 deletedAt: null,
-                date: {
-                    gte: startDate,
-                    lte: endDate,
-                },
+                OR: [
+                    { dueDate: { gte: start, lt: end } },
+                    { dueDate: null, date: { gte: twoMonthsBack, lt: end } },
+                ],
             },
-            orderBy: {
-                date: 'desc',
+            select: {
+                id: true,
+                creditCardId: true,
+                type: true,
+                amount: true,
+                date: true,
+                dueDate: true,
             },
-        });
+        })
     }
 
     async findDashboardTransactions(userId: string, range: { start: Date; end: Date }) {

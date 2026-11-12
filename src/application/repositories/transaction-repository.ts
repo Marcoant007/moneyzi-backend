@@ -139,7 +139,11 @@ export interface TransactionRepository {
     findUpcoming(startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date; user: { email: string; name: string } }>>
     findOverdue(since: Date, currentDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}> & { dueDate: Date; user: { email: string; name: string } }>>
     findByCreditCardAndPeriod(creditCardId: string, startDate: Date, endDate: Date): Promise<Array<Prisma.TransactionGetPayload<{}>>>
-    findByCreditCardId(creditCardId: string, month: number, year: number): Promise<Array<Prisma.TransactionGetPayload<{}>>>
+    findCardInvoiceCandidates(
+        creditCardIds: string[],
+        start: Date,
+        end: Date,
+    ): Promise<Array<Pick<Prisma.TransactionGetPayload<{}>, 'id' | 'creditCardId' | 'type' | 'amount' | 'date' | 'dueDate'>>>
     findDashboardTransactions(
         userId: string,
         range: { start: Date; end: Date }
