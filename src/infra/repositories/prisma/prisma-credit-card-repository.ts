@@ -35,7 +35,8 @@ export class PrismaCreditCardRepository implements CreditCardRepository {
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: {
-                    select: { transactions: true }
+                    // Só transações vivas — usado no aviso de exclusão.
+                    select: { transactions: { where: { deletedAt: null } } }
                 }
             }
         });
@@ -62,10 +63,14 @@ export class PrismaCreditCardRepository implements CreditCardRepository {
         });
     }
 
+    /**
+     * Exclusão de verdade (desativar é o `isActive`, que tem botão próprio).
+     * As transações do cartão NÃO são apagadas: a FK é ON DELETE SET NULL,
+     * então elas continuam no app como compras no cartão sem cartão vinculado.
+     */
     async delete(id: string): Promise<void> {
-        await prisma.creditCard.update({
-            where: { id },
-            data: { isActive: false }
+        await prisma.creditCard.delete({
+            where: { id }
         });
     }
 
