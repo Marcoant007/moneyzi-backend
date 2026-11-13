@@ -9,6 +9,7 @@ interface CardSpending {
     lastFourDigits: string;
     brand: string;
     color: string;
+    bank: string | null;
     totalSpent: number;
     transactionCount: number;
     limit: number | null;
@@ -82,6 +83,7 @@ export class GetCardsSpendingSummaryUseCase {
                 lastFourDigits: card.lastFourDigits || '',
                 brand: card.brand || 'OTHER',
                 color: card.color,
+                bank: card.bank ?? null,
                 totalSpent: total,
                 transactionCount: count,
                 limit,
