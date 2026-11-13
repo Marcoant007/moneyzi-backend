@@ -4,9 +4,9 @@ export interface CreateCreditCardData {
   name: string;
   lastFourDigits?: string;
   brand?: CardBrand;
-  limit?: number;
-  closingDay?: number;
-  dueDay?: number;
+  limit?: number | null;
+  closingDay?: number | null;
+  dueDay?: number | null;
   color?: string;
   bank?: string | null;
   userId: string;
@@ -16,9 +16,9 @@ export interface UpdateCreditCardData {
   name?: string;
   lastFourDigits?: string;
   brand?: CardBrand;
-  limit?: number;
-  closingDay?: number;
-  dueDay?: number;
+  limit?: number | null;
+  closingDay?: number | null;
+  dueDay?: number | null;
   color?: string;
   bank?: string | null;
   isActive?: boolean;

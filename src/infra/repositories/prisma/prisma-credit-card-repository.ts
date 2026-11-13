@@ -11,7 +11,7 @@ export class PrismaCreditCardRepository implements CreditCardRepository {
         return await prisma.creditCard.create({
             data: {
                 ...data,
-                limit: data.limit ? String(data.limit) : undefined,
+                limit: data.limit != null ? String(data.limit) : null,
             }
         });
     }
@@ -56,7 +56,8 @@ export class PrismaCreditCardRepository implements CreditCardRepository {
             where: { id },
             data: {
                 ...data,
-                limit: data.limit !== undefined ? String(data.limit) : undefined,
+                // undefined = não mexe; null = remove o limite.
+                limit: data.limit === undefined ? undefined : data.limit === null ? null : String(data.limit),
             }
         });
     }

@@ -1,21 +1,7 @@
-import { z } from 'zod';
 import { CreditCard } from '@prisma/client';
 import { CreditCardRepository } from '@/core/repositories/credit-card-repository';
 import { UserRepository } from '@/application/repositories/user-repository';
-
-const createCreditCardSchema = z.object({
-    name: z.string().min(1, 'Nome é obrigatório'),
-    lastFourDigits: z.string().length(4).optional(),
-    brand: z.enum(['VISA', 'MASTERCARD', 'ELO', 'AMEX', 'HIPERCARD', 'DINERS', 'DISCOVER', 'OTHER']).optional(),
-    limit: z.number().positive().optional(),
-    closingDay: z.number().min(1).max(31).optional(),
-    dueDay: z.number().min(1).max(31).optional(),
-    color: z.string().optional(),
-    bank: z.string().nullable().optional(),
-    userId: z.string()
-});
-
-type CreateCreditCardInput = z.infer<typeof createCreditCardSchema>;
+import { createCreditCardSchema, type CreateCreditCardInput } from './credit-card.schemas';
 
 export class CreateCreditCardUseCase {
     constructor(

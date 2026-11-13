@@ -5,6 +5,7 @@ import { ListCreditCardsUseCase } from '@/application/use-cases/credit-card-use-
 import { ListActiveCreditCardsUseCase } from '@/application/use-cases/credit-card-use-case/list-active-credit-cards.use-case';
 import { UpdateCreditCardUseCase } from '@/application/use-cases/credit-card-use-case/update-credit-card.use-case';
 import { DeleteCreditCardUseCase } from '@/application/use-cases/credit-card-use-case/delete-credit-card.use-case';
+import { CreditCardNotFoundError } from '@/application/use-cases/credit-card-use-case/credit-card.schemas';
 import { GetCardStatementUseCase } from '@/application/use-cases/credit-card-use-case/get-card-statement.use-case';
 import { GetCardsSpendingSummaryUseCase } from '@/application/use-cases/credit-card-use-case/get-cards-spending-summary.use-case';
 
@@ -65,14 +66,18 @@ export class CreditCardController {
 
     async update(request: FastifyRequest, reply: FastifyReply) {
         try {
+            const userId = request.headers['x-user-id'] as string;
             const { id } = request.params as { id: string };
             const body = request.body as any;
 
-            const card = await this.updateUseCase.execute(id, body);
+            const card = await this.updateUseCase.execute(id, userId, body);
             return reply.send(card);
         } catch (error) {
             if (error instanceof ZodError) {
                 return reply.status(400).send({ error: error.errors });
+            }
+            if (error instanceof CreditCardNotFoundError) {
+                return reply.status(404).send({ error: error.message });
             }
             console.error('[CreditCardController] Error updating credit card:', error);
             return reply.status(500).send({ error: 'Internal error' });
@@ -81,10 +86,14 @@ export class CreditCardController {
 
     async delete(request: FastifyRequest, reply: FastifyReply) {
         try {
+            const userId = request.headers['x-user-id'] as string;
             const { id } = request.params as { id: string };
-            await this.deleteUseCase.execute(id);
+            await this.deleteUseCase.execute(id, userId);
             return reply.status(204).send();
         } catch (error) {
+            if (error instanceof CreditCardNotFoundError) {
+                return reply.status(404).send({ error: error.message });
+            }
             console.error('[CreditCardController] Error deleting credit card:', error);
             return reply.status(500).send({ error: 'Internal error' });
         }
