@@ -7,6 +7,7 @@ import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-cat
 import type { CategoryRepository } from '@/application/repositories/category-repository'
 import logger from '@/lib/logger'
 import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
+import { normalizeCreditCardInvoiceRows } from './credit-card-invoice-normalizer'
 
 const categoryRepository: CategoryRepository = new PrismaCategoryRepository()
 
@@ -25,6 +26,21 @@ export class ImportService {
         if (type === 'ofx') return OfxParser.parse(buffer)
 
         throw new Error('Tipo de arquivo nao suportado')
+    }
+
+    // Aplica as mesmas regras de filtragem do import. Usado também pelo
+    // StartImportUseCase para que o total do ImportJob bata com o número de
+    // mensagens realmente publicadas (senão o job nunca chega a COMPLETED).
+    static prepareRows<T extends Partial<any>>(parsed: T[], isCreditCardInvoice?: boolean): T[] {
+        if (!isCreditCardInvoice) return parsed
+
+        const { rows, removedPayments, removedCredits, flippedSign } = normalizeCreditCardInvoiceRows(parsed)
+        if (removedPayments > 0 || removedCredits > 0 || flippedSign) {
+            console.log(
+                `Credit card invoice normalized: removedPayments=${removedPayments} removedCredits=${removedCredits} flippedSign=${flippedSign}`,
+            )
+        }
+        return rows
     }
 
     static async import(
@@ -53,17 +69,11 @@ export class ImportService {
         const normalizedUserId = userId.trim()
         const statementAnchorDate = this.resolveStatementAnchorDate(parsed)
 
-        // Entradas com valor negativo em faturas de cartão representam pagamentos
-        // da fatura ou créditos/estornos — não devem ser importados como despesas.
+        // Fatura de cartão: remove o pagamento da própria fatura (pela descrição, em
+        // qualquer sinal), ajusta a convenção de sinal do banco e mantém só compras.
+        // Ver credit-card-invoice-normalizer.ts.
         if (isCreditCardInvoice) {
-            const before = parsed.length
-            parsed = parsed.filter(
-                (t) => typeof t.amount === 'number' && t.amount > 0
-            )
-            const filtered = before - parsed.length
-            if (filtered > 0) {
-                console.log(`Filtered ${filtered} negative/zero-amount entries from credit card invoice`)
-            }
+            parsed = this.prepareRows(parsed, true)
         }
 
         // Pré-classifica todas as transações em batch (reduz N chamadas Gemini para ceil(N/50)).
@@ -100,9 +110,12 @@ export class ImportService {
                 creditCardId,
                 isCreditCardInvoice: Boolean(isCreditCardInvoice),
                 statementAnchorDate: statementAnchorDate ?? undefined,
-                type: classification?.type,
+                // Linha de fatura (já normalizada) é sempre compra no cartão. A IA só vê
+                // a descrição e, se errasse o tipo (ou caísse no fallback), a linha
+                // inflaria ou zeraria a fatura. A IA segue decidindo só a categoria.
+                type: isCreditCardInvoice ? 'EXPENSE' : classification?.type,
                 category: (csvCategory as TransactionMessage['category']) ?? classification?.category,
-                paymentMethod: classification?.paymentMethod,
+                paymentMethod: isCreditCardInvoice ? 'CREDIT_CARD' : classification?.paymentMethod,
                 categoryId: csvCategoryId ?? classification?.categoryId,
             }
 

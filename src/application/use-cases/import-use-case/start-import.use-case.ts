@@ -34,11 +34,22 @@ export class StartImportUseCase {
         console.log('User found, parsing file buffer of size:', input.fileBuffer.length)
         let parsed: any[]
         try {
-            parsed = ImportService.parseOnly(input.fileBuffer, region)
+            // Mesmas regras de filtragem do ImportService.import: o total do job precisa
+            // bater com o número de mensagens publicadas, senão ele nunca vira COMPLETED.
+            parsed = ImportService.prepareRows(
+                ImportService.parseOnly(input.fileBuffer, region),
+                input.isCreditCardInvoice,
+            )
             console.log('File parsed successfully, found', parsed.length, 'transactions')
         } catch (error) {
             console.error('Error parsing file:', error)
             throw new Error('Erro ao processar arquivo: ' + (error instanceof Error ? error.message : 'Formato inválido'))
+        }
+
+        // Sem linhas, nenhuma mensagem é publicada e o job ficaria em PROCESSING para sempre.
+        if (parsed.length === 0) {
+            // Prefixo "Erro ao processar arquivo:" faz o controller responder 400 com a mensagem.
+            throw new Error('Erro ao processar arquivo: nenhuma compra encontrada. Verifique se o arquivo tem as colunas de data, descrição e valor.')
         }
 
         // Falha rápido: sem fila não adianta gastar minutos classificando com a IA

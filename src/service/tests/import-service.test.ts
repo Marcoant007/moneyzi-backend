@@ -120,4 +120,43 @@ describe('ImportService', () => {
             expect(message.name).toBe('Grocery Store')
         })
     })
+
+    describe('credit card invoice', () => {
+        it('drops a positive invoice payment and forces EXPENSE/CREDIT_CARD even if the AI says DEPOSIT', async () => {
+            const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
+            const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
+            ;(detectTransactionsBatchWithIA as any).mockResolvedValueOnce([
+                { type: 'DEPOSIT', category: 'OTHER', paymentMethod: 'PIX' },
+            ])
+            ;(publishToQueue as any).mockClear()
+
+            const csv = Buffer.from(
+                'Data,Descrição,Valor\n' +
+                '"10/03/2025","Mercado","R$ 4.000,00"\n' +
+                '"15/03/2025","Pagamento recebido","R$ 4.000,00"',
+            )
+
+            await ImportService.import(csv, 'user-cc', 'job-cc', 'card-1', true)
+
+            const messages = (publishToQueue as any).mock.calls.map((c: any[]) => c[0])
+            expect(messages).toHaveLength(1)
+            expect(messages[0].name).toBe('Mercado')
+            expect(messages[0].type).toBe('EXPENSE')
+            expect(messages[0].paymentMethod).toBe('CREDIT_CARD')
+            expect(messages[0].creditCardId).toBe('card-1')
+        })
+
+        it('prepareRows returns the same row count the import publishes (job total stays consistent)', () => {
+            const csv = Buffer.from(
+                'Data,Descrição,Valor\n' +
+                '"10/03/2025","Mercado","R$ 100,00"\n' +
+                '"15/03/2025","Pagamento recebido","-R$ 100,00"',
+            )
+
+            const parsed = ImportService.parseOnly(csv)
+            expect(parsed).toHaveLength(2)
+            expect(ImportService.prepareRows(parsed, true)).toHaveLength(1)
+            expect(ImportService.prepareRows(parsed, false)).toHaveLength(2)
+        })
+    })
 })

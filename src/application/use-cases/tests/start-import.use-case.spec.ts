@@ -5,6 +5,7 @@ import { ImportService } from '@/service/import-service'
 vi.mock('@/service/import-service', () => ({
     ImportService: {
         parseOnly: vi.fn().mockReturnValue([{ name: 'Padaria', amount: 12.5 }]),
+        prepareRows: vi.fn((rows: unknown[]) => rows),
         import: vi.fn().mockResolvedValue(undefined),
     },
 }))
@@ -51,6 +52,28 @@ describe('StartImportUseCase', () => {
         queue.ready = true
         vi.mocked(ImportService.parseOnly).mockReturnValue([{ name: 'Padaria', amount: 12.5 }])
         vi.mocked(ImportService.import).mockResolvedValue(undefined as any)
+    })
+
+    it('creates the job with the row count left after invoice filtering and rejects files with no purchases', async () => {
+        const { userRepository, importJobRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository)
+
+        vi.mocked(ImportService.parseOnly).mockReturnValue([
+            { name: 'Mercado', amount: 10 },
+            { name: 'Pagamento recebido', amount: 10 },
+        ])
+        vi.mocked(ImportService.prepareRows).mockReturnValueOnce([{ name: 'Mercado', amount: 10 }])
+
+        await sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv'), isCreditCardInvoice: true })
+
+        expect(ImportService.prepareRows).toHaveBeenCalledWith(expect.any(Array), true)
+        expect(importJobRepository.create).toHaveBeenCalledWith(expect.objectContaining({ total: 1 }))
+
+        vi.mocked(ImportService.prepareRows).mockReturnValueOnce([])
+        await expect(
+            sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv'), isCreditCardInvoice: true }),
+        ).rejects.toThrow(/^Erro ao processar arquivo:/)
+        expect(importJobRepository.create).toHaveBeenCalledTimes(1)
     })
 
     it('defaults region to BR when not provided', async () => {
