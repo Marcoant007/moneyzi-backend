@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Imports estáticos (os vi.mock abaixo são içados antes deles): import dinâmico
+// dentro do teste contava no timeout de 5s e estourava no pre-push.
+import { ImportService } from '../import-service'
+import { detectTransactionsBatchWithIA } from '@/core/gemini/detect-transactions-batch-with-ia'
 
 vi.mock('@/infra/queue/rabbitmq/rabbitmq', () => ({
     publishToQueue: vi.fn(),
@@ -34,8 +38,6 @@ describe('ImportService — observabilidade de fallback (Etapa 3)', () => {
     })
 
     it('loga um warn com a contagem de fallback quando a IA degrada parte da importação', async () => {
-        const { ImportService } = await import('../import-service')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         ;(detectTransactionsBatchWithIA as any).mockResolvedValue([
             { type: 'EXPENSE', category: 'OTHER', paymentMethod: 'CREDIT_CARD', usedFallback: true },
@@ -61,8 +63,6 @@ describe('ImportService — observabilidade de fallback (Etapa 3)', () => {
     })
 
     it('não loga nada quando nenhuma transação usou fallback', async () => {
-        const { ImportService } = await import('../import-service')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         ;(detectTransactionsBatchWithIA as any).mockResolvedValue([
             { type: 'EXPENSE', category: 'FOOD', paymentMethod: 'CREDIT_CARD', categoryId: 'ai-cat-1' },
@@ -76,8 +76,6 @@ describe('ImportService — observabilidade de fallback (Etapa 3)', () => {
     })
 
     it('não conta como "unrescued" quando o CSV já resolveu a categoria, mesmo com fallback de type/paymentMethod', async () => {
-        const { ImportService } = await import('../import-service')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         // IA falhou (usedFallback), mas o CSV já reconheceu "Supermercado" → categoria não perdida
         ;(detectTransactionsBatchWithIA as any).mockResolvedValue([

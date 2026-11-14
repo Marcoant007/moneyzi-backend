@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// Import estático (os vi.mock abaixo são içados antes dele): import dinâmico
+// dentro do teste contava no timeout de 5s e estourava no pre-push.
+import { detectTransactionsBatchWithIA } from '../detect-transactions-batch-with-ia'
 
 const generateContentMock = vi.fn()
 
@@ -42,7 +45,6 @@ describe('detectTransactionsBatchWithIA', () => {
     })
 
     it('classifies every item normally on the happy path', async () => {
-        const { detectTransactionsBatchWithIA } = await import('../detect-transactions-batch-with-ia')
 
         generateContentMock.mockImplementation(async (prompt: string) => {
             const count = countTransactionLines(prompt)
@@ -67,7 +69,6 @@ describe('detectTransactionsBatchWithIA', () => {
     })
 
     it('isolates a single problematic transaction instead of collapsing the whole batch to OTHER', async () => {
-        const { detectTransactionsBatchWithIA } = await import('../detect-transactions-batch-with-ia')
 
         // Qualquer sub-lote que ainda contenha o item "POISON" falha (simulando uma
         // resposta malformada do Gemini para aquele item específico); os demais
@@ -108,7 +109,6 @@ describe('detectTransactionsBatchWithIA', () => {
     })
 
     it('falls back the whole batch immediately on 429, without waiting on Gemini\'s retryDelay (user recategorizes later via MCP)', async () => {
-        const { detectTransactionsBatchWithIA } = await import('../detect-transactions-batch-with-ia')
 
         generateContentMock.mockRejectedValue({ status: 429, statusText: 'Too Many Requests' })
 

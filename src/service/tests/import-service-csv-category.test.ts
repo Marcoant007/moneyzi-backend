@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+// Imports estáticos (os vi.mock abaixo são içados antes deles): carregar o módulo
+// dentro de cada teste contava no timeout de 5s e estourava no pre-push, com a
+// suíte inteira rodando em paralelo.
+import { ImportService } from '../import-service'
+import { publishToQueue } from '@/infra/queue/rabbitmq/rabbitmq'
+import { detectTransactionsBatchWithIA } from '@/core/gemini/detect-transactions-batch-with-ia'
 
 vi.mock('@/infra/queue/rabbitmq/rabbitmq', () => ({
     publishToQueue: vi.fn(),
@@ -30,9 +36,6 @@ describe('ImportService — CSV category takes precedence over AI', () => {
     })
 
     it('keeps the category resolved from the CSV even when the AI batch call falls back to OTHER', async () => {
-        const { ImportService } = await import('../import-service')
-        const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         // Simula a IA falhando e caindo no fallback do lote inteiro (comportamento
         // documentado em docs/investigacao-categorizacao-import-inter.md)
@@ -55,9 +58,6 @@ describe('ImportService — CSV category takes precedence over AI', () => {
     })
 
     it('reuses an existing user category instead of creating a duplicate', async () => {
-        const { ImportService } = await import('../import-service')
-        const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         categoryRepoMocks.listByUserId.mockResolvedValue([
             { id: 'existing-food-cat', name: 'Alimentação', userId: 'user-1' },
@@ -78,9 +78,6 @@ describe('ImportService — CSV category takes precedence over AI', () => {
     })
 
     it('only matches/caches top-level categories by name, ignoring a subcategory with the same name', async () => {
-        const { ImportService } = await import('../import-service')
-        const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         categoryRepoMocks.listByUserId.mockResolvedValue([
             { id: 'sub-alimentacao', name: 'Alimentação', userId: 'user-1', parentId: 'some-parent' },
@@ -102,9 +99,6 @@ describe('ImportService — CSV category takes precedence over AI', () => {
     })
 
     it('falls back to the AI classification when the CSV category is not recognized', async () => {
-        const { ImportService } = await import('../import-service')
-        const { publishToQueue } = await import('@/infra/queue/rabbitmq/rabbitmq')
-        const { detectTransactionsBatchWithIA } = await import('@/core/gemini/detect-transactions-batch-with-ia')
 
         ;(detectTransactionsBatchWithIA as any).mockResolvedValue([
             { type: 'EXPENSE', category: 'TRANSPORTATION', paymentMethod: 'CREDIT_CARD', categoryId: 'ai-cat-1' },

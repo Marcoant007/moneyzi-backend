@@ -7,6 +7,10 @@ export default defineConfig({
         globals: true,
         root: './',
         exclude: ['dist/**', 'node_modules/**', 'coverage/**'],
+        // Vários testes fazem `await import(...)` dentro do it(): o carregamento do
+        // módulo conta no timeout e, com a suíte inteira em paralelo (pre-push),
+        // passava dos 5s padrão de forma intermitente. A folga ainda pega teste travado.
+        testTimeout: 15000,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'lcov'],
