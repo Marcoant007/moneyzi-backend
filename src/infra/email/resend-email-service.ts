@@ -14,7 +14,7 @@ function getClient(): Resend {
     return client
 }
 
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Moneyzi <notificacoes@moneyzi.app>'
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Moneyzi <notificacoes@moneyzi.com.br>'
 
 // Envio de email best-effort: erros sao logados mas nunca propagados, para que uma
 // falha no Resend (ou RESEND_API_KEY ausente) nunca derrube um job de notificacao
