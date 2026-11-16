@@ -144,6 +144,8 @@ model User {
   mcpTokens               McpToken[]
   mcpAuditLogs            McpAuditLog[]
   oauthAuthorizationCodes OAuthAuthorizationCode[]
+  supportTickets          SupportTicket[]
+  productFeedbacks        ProductFeedback[]
 }
 
 model McpToken {
@@ -367,6 +369,45 @@ model TrialFeedback {
   @@index([userId])
 }
 
+enum SupportTicketCategory {
+  BUG
+  QUESTION
+  BILLING
+  OTHER
+}
+
+enum SupportTicketStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+/// Chamado aberto pelo balão de suporte do app. O atendimento é assíncrono:
+/// o admin recebe um e-mail com Reply-To = e-mail do usuário e responde de lá.
+/// `context` guarda o diagnóstico capturado no navegador (página, user agent,
+/// erros recentes) e a conversa com a IA de suporte que antecedeu o chamado.
+model SupportTicket {
+  id         String                @id @default(uuid())
+  protocol   String                @unique
+  userId     String
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  category   SupportTicketCategory
+  message    String
+  pageUrl    String?
+  userAgent  String?
+  locale     String?
+  context    Json?
+  aiPriority String?
+  aiSummary  String?
+  status     SupportTicketStatus   @default(OPEN)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
 enum IncomeStability {
   STABLE
   VARIABLE
@@ -398,5 +439,33 @@ model AiDeepAnalysis {
   regeneratedCount Int      @default(0)
 
   @@unique([userId, period])
+  @@index([userId])
+}
+
+enum ProductFeedbackKind {
+  SUGGESTION
+  CRITICISM
+  PRAISE
+  FEATURE_REQUEST
+}
+
+/// Sugestões, críticas e elogios enviados pelo balão de ajuda. Separado do
+/// SupportTicket: não exige resposta, serve para priorizar o roadmap.
+model ProductFeedback {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  kind      ProductFeedbackKind
+  rating    Int?
+  area      String?
+  message   String
+  pageUrl   String?
+  locale    String?
+  country   String?
+  createdAt DateTime            @default(now())
+
+  @@index([createdAt])
+  @@index([kind, createdAt])
   @@index([userId])
 }
