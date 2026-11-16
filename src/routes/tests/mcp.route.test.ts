@@ -28,6 +28,12 @@ vi.mock('@/lib/prisma', () => ({
     prisma: new Proxy({}, { get: (_t, prop) => { throw new Error(`o banco não deveria ser acessado (prisma.${String(prop)})`) } }),
 }))
 
+// Paywall testado à parte (billing-access.test.ts); aqui só controla o resultado.
+const billing = vi.hoisted(() => ({ blocked: false }))
+vi.mock('@/utils/billing-access', () => ({
+    isUserBillingBlocked: vi.fn(async () => billing.blocked),
+}))
+
 const NEW_TOOLS = ['merge_categories', 'rename_category', 'move_category', 'delete_category']
 
 type App = ReturnType<typeof Fastify>
@@ -68,6 +74,7 @@ describe('POST /mcp — scope reaches the tool registry', () => {
     })
 
     beforeEach(() => {
+        billing.blocked = false
         tokens.clear()
         tokens.set(hashMcpToken('read-token'), { id: 't1', userId: 'user-1', scope: 'read' })
         tokens.set(hashMcpToken('write-token'), { id: 't2', userId: 'user-1', scope: 'read_write' })
@@ -116,5 +123,14 @@ describe('POST /mcp — scope reaches the tool registry', () => {
 
         expect(merge.description).toContain('ESTA FERRAMENTA EXIGE DUAS CHAMADAS')
         expect(merge.description).toContain('confirmationToken')
+    })
+
+    it('refuses MCP access with 402 when the subscription/trial is blocked', async () => {
+        billing.blocked = true
+
+        const response = await rpc(app, 'read-token', 'tools/list')
+
+        expect(response.statusCode).toBe(402)
+        expect(response.json()).toMatchObject({ error: 'subscription_required' })
     })
 })

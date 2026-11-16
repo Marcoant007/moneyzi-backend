@@ -2,6 +2,32 @@ import { prisma } from '@/lib/prisma'
 import type { TransactionRepository, PayablesFilter, UpsertTransactionData, McpTransactionFilter, McpTransactionSnapshot, CreatedTransactionSnapshot } from '@/application/repositories/transaction-repository'
 import type { Prisma, TransactionCategory, TransactionType } from '@prisma/client'
 
+export class TransactionAccessError extends Error {
+    constructor(readonly code: 'TRANSACTION_NOT_FOUND' | 'INVALID_REFERENCE') {
+        super(code)
+        this.name = 'TransactionAccessError'
+    }
+}
+
+/**
+ * categoryId/accountId/creditCardId chegam do cliente. Sem esta checagem dava
+ * para pendurar uma transação na categoria, conta ou cartão (fatura) de outro
+ * usuário.
+ */
+async function assertReferencesOwnedBy(
+    userId: string,
+    refs: { categoryId?: string | null; accountId?: string | null; creditCardId?: string | null },
+): Promise<void> {
+    const checks: Promise<number>[] = []
+    if (refs.categoryId) checks.push(prisma.category.count({ where: { id: refs.categoryId, userId } }))
+    if (refs.accountId) checks.push(prisma.account.count({ where: { id: refs.accountId, userId } }))
+    if (refs.creditCardId) checks.push(prisma.creditCard.count({ where: { id: refs.creditCardId, userId } }))
+    const counts = await Promise.all(checks)
+    if (counts.some((count) => count === 0)) {
+        throw new TransactionAccessError('INVALID_REFERENCE')
+    }
+}
+
 // Categorias que são consideradas fixas mesmo sem o flag isRecurring=true
 // Deve estar em sincronia com FIXED_ENUM_CATEGORIES em get-monthly-summary.use-case.ts
 const FIXED_ENUM_CATEGORIES: TransactionCategory[] = [
@@ -78,12 +104,19 @@ export class PrismaTransactionRepository implements TransactionRepository {
         const paidAt = status === 'PAID' ? (date ?? new Date()) : null
         const amountStr = String(amount)
 
+        await assertReferencesOwnedBy(userId, rest)
+
         if (id) {
-            await prisma.transaction.upsert({
-                where: { id },
-                update: { ...rest, userId, amount: amountStr, paymentStatus: status, date },
-                create: { ...rest, id, userId, amount: amountStr, paymentStatus: status, date, paidAt },
+            // Só atualiza transação do próprio usuário. Antes era um upsert por
+            // id: com o id de outra pessoa dava para sobrescrever a transação e
+            // ainda tomá-la para si (userId era regravado), ou criar com id escolhido.
+            const result = await prisma.transaction.updateMany({
+                where: { id, userId },
+                data: { ...rest, amount: amountStr, paymentStatus: status, date },
             })
+            if (result.count === 0) {
+                throw new TransactionAccessError('TRANSACTION_NOT_FOUND')
+            }
         } else {
             await prisma.transaction.create({
                 data: { ...rest, userId, amount: amountStr, paymentStatus: status, date, paidAt },
@@ -96,6 +129,7 @@ export class PrismaTransactionRepository implements TransactionRepository {
     }
 
     async updateManyCategory(ids: string[], userId: string, data: { category?: TransactionCategory; categoryId?: string | null }): Promise<number> {
+        await assertReferencesOwnedBy(userId, { categoryId: data.categoryId })
         const result = await prisma.transaction.updateMany({
             where: { id: { in: ids }, userId },
             data,

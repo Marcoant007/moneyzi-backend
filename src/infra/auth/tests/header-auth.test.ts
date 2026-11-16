@@ -1,92 +1,61 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import headerAuth from '@/infra/auth/header-auth'
 
+async function run(headers: Record<string, string>) {
+    let hook: any
+    const app = {
+        addHook: (_evt: string, fn: any) => {
+            hook = fn
+        },
+    } as any
+
+    await headerAuth(app)
+
+    const reply = { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
+    await hook({ headers }, reply)
+    return reply
+}
+
 describe('headerAuth', () => {
     beforeEach(() => {
-        delete process.env.MONEYZI_APP_KEY
+        process.env.MONEYZI_APP_KEY = 'secret'
     })
 
     afterEach(() => {
         delete process.env.MONEYZI_APP_KEY
     })
 
-    it('returns 401 when x-user-id header is missing', async () => {
-        let hook: any
-        const app = {
-            addHook: (evt: string, fn: any) => {
-                hook = fn
-            },
-        } as any
+    it('rejects everything when MONEYZI_APP_KEY is not configured (fail-closed)', async () => {
+        delete process.env.MONEYZI_APP_KEY
 
-        await headerAuth(app)
+        const reply = await run({ 'x-user-id': 'u1', 'x-api-key': 'anything' })
 
-        const req = { headers: {} } as any
-        const reply = { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
-
-        await hook(req, reply)
-
-        expect(reply.status).toHaveBeenCalledWith(401)
-        expect(reply.send).toHaveBeenCalledWith({ error: 'Missing x-user-id header' })
+        expect(reply.status).toHaveBeenCalledWith(503)
     })
 
-    it('returns 403 when configured api key is present and provided key mismatches', async () => {
-        process.env.MONEYZI_APP_KEY = 'secret'
-
-        let hook: any
-        const app = {
-            addHook: (evt: string, fn: any) => {
-                hook = fn
-            },
-        } as any
-
-        await headerAuth(app)
-
-        const req = { headers: { 'x-user-id': 'u1', 'x-api-key': 'wrong' } } as any
-        const reply = { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
-
-        await hook(req, reply)
+    it('returns 403 when the api key is missing', async () => {
+        const reply = await run({ 'x-user-id': 'u1' })
 
         expect(reply.status).toHaveBeenCalledWith(403)
         expect(reply.send).toHaveBeenCalledWith({ error: 'Invalid api key' })
     })
 
-    it('does not call reply when headers are valid and api key matches', async () => {
-        process.env.MONEYZI_APP_KEY = 'secret'
+    it('returns 403 when the api key mismatches', async () => {
+        const reply = await run({ 'x-user-id': 'u1', 'x-api-key': 'wrong' })
 
-        let hook: any
-        const app = {
-            addHook: (evt: string, fn: any) => {
-                hook = fn
-            },
-        } as any
-
-        await headerAuth(app)
-
-        const req = { headers: { 'x-user-id': 'u1', 'x-api-key': 'secret' } } as any
-        const reply = { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
-
-        await hook(req, reply)
-
-        expect(reply.status).not.toHaveBeenCalled()
-        expect(reply.send).not.toHaveBeenCalled()
+        expect(reply.status).toHaveBeenCalledWith(403)
+        expect(reply.send).toHaveBeenCalledWith({ error: 'Invalid api key' })
     })
 
-    it('does not check api key when MONEYZI_APP_KEY is not configured', async () => {
-        delete process.env.MONEYZI_APP_KEY
+    it('returns 401 when x-user-id is missing even with a valid key', async () => {
+        const reply = await run({ 'x-api-key': 'secret' })
 
-        let hook: any
-        const app = {
-            addHook: (evt: string, fn: any) => {
-                hook = fn
-            },
-        } as any
+        expect(reply.status).toHaveBeenCalledWith(401)
+        expect(reply.send).toHaveBeenCalledWith({ error: 'Missing x-user-id header' })
+    })
 
-        await headerAuth(app)
-
-        const req = { headers: { 'x-user-id': 'u1' } } as any
-        const reply = { status: vi.fn().mockReturnThis(), send: vi.fn().mockReturnThis() } as any
-
-        await hook(req, reply)
+    it('does not call reply when the api key matches and x-user-id is present', async () => {
+        const reply = await run({ 'x-user-id': 'u1', 'x-api-key': 'secret' })
 
         expect(reply.status).not.toHaveBeenCalled()
         expect(reply.send).not.toHaveBeenCalled()

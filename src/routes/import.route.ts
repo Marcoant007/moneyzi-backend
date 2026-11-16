@@ -8,6 +8,7 @@ import { GetImportJobStatusUseCase } from '@/application/use-cases/import-use-ca
 import { GetDashboardUseCase } from '@/application/use-cases/dashboard-use-case/get-dashboard.use-case'
 import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-category-repository'
 import { PrismaAccountRepository } from '@/infra/repositories/prisma/prisma-account-repository'
+import { PrismaCreditCardRepository } from '@/infra/repositories/prisma/prisma-credit-card-repository'
 
 export async function importRoutes(app: FastifyInstance) {
     app.get('/health', async (request, reply) => {
@@ -36,7 +37,7 @@ function buildImportController(): ImportController {
     const categoryRepository = new PrismaCategoryRepository()
     const accountRepository = new PrismaAccountRepository()
 
-    const startImportUseCase = new StartImportUseCase(userRepository, importJobRepository)
+    const startImportUseCase = new StartImportUseCase(userRepository, importJobRepository, new PrismaCreditCardRepository())
     const getImportJobStatusUseCase = new GetImportJobStatusUseCase(importJobRepository)
     const getDashboardUseCase = new GetDashboardUseCase(
         transactionRepository,

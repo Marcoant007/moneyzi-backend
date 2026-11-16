@@ -63,11 +63,14 @@ export class NotificationController {
     async markAsRead(request: FastifyRequest, reply: FastifyReply) {
         try {
             const { id } = request.params as { id: string }
+            const userId = request.headers['x-user-id'] as string
 
-            const notification =
-                await this.markNotificationAsReadUseCase.execute(id)
+            const updated = await this.markNotificationAsReadUseCase.execute(id, userId)
+            if (!updated) {
+                return reply.status(404).send({ error: 'Notificação não encontrada' })
+            }
 
-            return reply.status(200).send(notification)
+            return reply.status(200).send({ success: true })
         } catch (error) {
             console.error('Error marking notification as read:', error)
             return reply.status(500).send({ error: 'Internal server error' })

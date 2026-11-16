@@ -97,7 +97,8 @@ export class ImportController {
         const { id } = request.params as { id: string }
 
         try {
-            const { job } = await this.getImportJobStatusUseCase.execute({ id })
+            const userId = request.headers['x-user-id'] as string
+            const { job } = await this.getImportJobStatusUseCase.execute({ id, userId })
             if (!job) {
                 return reply.status(404).send({ error: 'Job não encontrado' })
             }

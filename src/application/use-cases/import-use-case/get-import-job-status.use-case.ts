@@ -4,9 +4,10 @@ import type { ImportJobRepository } from '@/application/repositories/import-job-
 export class GetImportJobStatusUseCase {
     constructor(private readonly importJobRepository: ImportJobRepository) { }
 
-    async execute(input: { id: string }): Promise<{ job: ImportJobDto | null }> {
+    async execute(input: { id: string; userId: string }): Promise<{ job: ImportJobDto | null }> {
         const job = await this.importJobRepository.findById(input.id)
-        if (!job) return { job: null }
+        // Job de outro usuário responde igual a inexistente (404), sem vazar nada.
+        if (!job || job.userId !== input.userId) return { job: null }
 
         return {
             job: {

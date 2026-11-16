@@ -65,7 +65,14 @@ export class TransactionController {
             if (error instanceof Error && error.message === 'INSUFFICIENT_BALANCE') {
                 return reply.status(422).send({ error: 'INSUFFICIENT_BALANCE' })
             }
-            return reply.status(500).send({ error: error instanceof Error ? error.message : 'Internal error' })
+            if (error instanceof Error && error.message === 'TRANSACTION_NOT_FOUND') {
+                return reply.status(404).send({ error: 'Transação não encontrada' })
+            }
+            if (error instanceof Error && error.message === 'INVALID_REFERENCE') {
+                return reply.status(400).send({ error: 'Categoria, conta ou cartão inválido' })
+            }
+            request.log.error(error)
+            return reply.status(500).send({ error: 'Internal error' })
         }
     }
 

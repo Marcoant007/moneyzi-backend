@@ -43,7 +43,11 @@ function makeRepositories() {
         create: vi.fn().mockResolvedValue(makeJob()),
     } as any
 
-    return { userRepository, importJobRepository }
+    const creditCardRepository = {
+        findById: vi.fn().mockResolvedValue({ id: 'card-1', userId: 'user-1' }),
+    } as any
+
+    return { userRepository, importJobRepository, creditCardRepository }
 }
 
 describe('StartImportUseCase', () => {
@@ -55,8 +59,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('creates the job with the row count left after invoice filtering and rejects files with no purchases', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         vi.mocked(ImportService.parseOnly).mockReturnValue([
             { name: 'Mercado', amount: 10 },
@@ -77,8 +81,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('defaults region to BR when not provided', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv') })
 
@@ -94,8 +98,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('forwards region=US through parseOnly and import', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv'), region: 'US' })
 
@@ -112,8 +116,8 @@ describe('StartImportUseCase', () => {
 
     it('fails fast without creating a job or calling the AI when the queue is down', async () => {
         queue.ready = false
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await expect(
             sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('x') }),
@@ -124,8 +128,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('trims userId before looking up the user', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await sut.execute({ userId: '  user-1  ', fileBuffer: Buffer.from('csv') })
 
@@ -133,8 +137,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('throws Usuário inválido for an empty/whitespace userId', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await expect(
             sut.execute({ userId: '   ', fileBuffer: Buffer.from('csv') }),
@@ -142,9 +146,9 @@ describe('StartImportUseCase', () => {
     })
 
     it('throws Usuário não encontrado when the user repository returns null', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
         userRepository.findById.mockResolvedValue(null)
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await expect(
             sut.execute({ userId: 'ghost', fileBuffer: Buffer.from('csv') }),
@@ -152,11 +156,11 @@ describe('StartImportUseCase', () => {
     })
 
     it('wraps a parse failure with a descriptive error, regardless of region', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
         vi.mocked(ImportService.parseOnly).mockImplementation(() => {
             throw new Error('Invalid CSV')
         })
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await expect(
             sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv'), region: 'US' }),
@@ -164,8 +168,8 @@ describe('StartImportUseCase', () => {
     })
 
     it('forwards creditCardId and isCreditCardInvoice alongside region', async () => {
-        const { userRepository, importJobRepository } = makeRepositories()
-        const sut = new StartImportUseCase(userRepository, importJobRepository)
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
 
         await sut.execute({
             userId: 'user-1',
@@ -186,5 +190,17 @@ describe('StartImportUseCase', () => {
         expect(importJobRepository.create).toHaveBeenCalledWith(
             expect.objectContaining({ creditCardId: 'card-1', isCreditCardInvoice: true }),
         )
+    })
+
+    it('rejects importing into a credit card that belongs to another user', async () => {
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        creditCardRepository.findById.mockResolvedValue({ id: 'card-x', userId: 'someone-else' })
+        const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
+
+        await expect(
+            sut.execute({ userId: 'user-1', fileBuffer: Buffer.from('csv'), creditCardId: 'card-x' }),
+        ).rejects.toThrow('Erro ao processar arquivo: cartão não encontrado')
+        expect(importJobRepository.create).not.toHaveBeenCalled()
+        expect(ImportService.import).not.toHaveBeenCalled()
     })
 })

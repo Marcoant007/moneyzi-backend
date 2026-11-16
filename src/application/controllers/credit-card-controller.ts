@@ -104,18 +104,27 @@ export class CreditCardController {
             const { id } = request.params as { id: string };
             const { month, year } = request.query as { month: string; year: string };
 
+            const userId = request.headers['x-user-id'] as string;
+            const monthNumber = parseInt(month);
+            const yearNumber = parseInt(year);
+            if (!Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > 12 || !Number.isInteger(yearNumber)) {
+                return reply.status(400).send({ error: 'Mês ou ano inválido' });
+            }
+
             const statement = await this.getStatementUseCase.execute(
                 id,
-                parseInt(month),
-                parseInt(year)
+                monthNumber,
+                yearNumber,
+                userId,
             );
 
             return reply.send(statement);
         } catch (error) {
+            if (error instanceof Error && error.message === 'Card not found') {
+                return reply.status(404).send({ error: 'Cartão não encontrado' });
+            }
             console.error('[CreditCardController] Error getting statement:', error);
-            return reply.status(500).send({
-                error: error instanceof Error ? error.message : 'Internal error'
-            });
+            return reply.status(500).send({ error: 'Internal error' });
         }
     }
 

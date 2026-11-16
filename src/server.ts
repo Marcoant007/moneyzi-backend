@@ -9,7 +9,6 @@ import { reportRoutes } from '@routes/report.routes'
 import { deepAnalysisRoutes } from '@routes/deep-analysis.routes'
 import { notificationRoutes } from '@routes/notification.route'
 import { cronRoutes } from '@routes/cron.route'
-import { userRoutes } from '@routes/user.route'
 import { creditCardRoutes } from '@routes/credit-card.route'
 import { payablesRoutes } from '@routes/payables.route'
 import { accountRoutes } from '@routes/account.route'
@@ -23,26 +22,34 @@ import { oauthConsentRoutes } from '@routes/oauth-consent.route'
 import Fastify from 'fastify'
 import headerAuth from '@/infra/auth/header-auth'
 import logger from '@/lib/logger'
+import { registerErrorResponseSanitizer } from '@/infra/http/sanitize-error-responses'
 
 async function bootstrap() {
     const app = Fastify()
 
+    // Antes de qualquer rota: vale para todas as respostas de erro.
+    registerErrorResponseSanitizer(app)
+
+    // O navegador não chama este backend (só o servidor Next.js e clientes
+    // OAuth/MCP, que não usam CORS). Sem FRONTEND_URL, nenhuma origem é liberada.
     await app.register(fastifyCors, {
-        origin: process.env.FRONTEND_URL || '*',
+        origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : false,
         credentials: true
     })
     // POST /oauth/token precisa aceitar application/x-www-form-urlencoded (RFC 6749 §4.1.3).
     await app.register(fastifyFormbody)
 
     await app.register(cronRoutes)
-    await app.register(userRoutes)
     await app.register(mcpRoutes)
     await app.register(oauthRoutes)
 
     await app.register(async (protectedApp) => {
         await headerAuth(protectedApp)
 
-        protectedApp.register(fastifyMultipart)
+        protectedApp.register(fastifyMultipart, {
+            // Faturas em CSV/OFX são pequenas; limites explícitos evitam abuso de memória.
+            limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 10, fieldSize: 1024 },
+        })
         protectedApp.register(oauthConsentRoutes)
         protectedApp.register(importRoutes)
         protectedApp.register(categoryRoutes)

@@ -2,6 +2,7 @@ import { ImportService } from '@/service/import-service'
 import { ImportJobDto } from '@/core/dtos/import-job.dto'
 import type { ImportJobRepository } from '@/application/repositories/import-job-repository'
 import type { UserRepository } from '@/application/repositories/user-repository'
+import type { CreditCardRepository } from '@/core/repositories/credit-card-repository'
 import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 import { ImportJobStatus } from '@prisma/client'
 import { isQueueReady, QueueUnavailableError } from '@/infra/queue/rabbitmq/rabbitmq'
@@ -10,6 +11,7 @@ export class StartImportUseCase {
     constructor(
         private readonly userRepository: UserRepository,
         private readonly importJobRepository: ImportJobRepository,
+        private readonly creditCardRepository: Pick<CreditCardRepository, 'findById'>,
     ) { }
 
     async execute(input: {
@@ -29,6 +31,15 @@ export class StartImportUseCase {
         const user = await this.userRepository.findById(userId)
         if (!user) {
             throw new Error('Usuário não encontrado')
+        }
+
+        // O cartão vem do formulário: sem esta checagem dava para importar
+        // transações para o cartão (e a fatura) de outro usuário.
+        if (input.creditCardId) {
+            const card = await this.creditCardRepository.findById(input.creditCardId)
+            if (!card || card.userId !== userId) {
+                throw new Error('Erro ao processar arquivo: cartão não encontrado')
+            }
         }
 
         console.log('User found, parsing file buffer of size:', input.fileBuffer.length)

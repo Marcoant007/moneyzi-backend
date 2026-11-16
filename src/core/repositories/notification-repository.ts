@@ -4,7 +4,7 @@ export interface NotificationRepository {
     create(data: CreateNotificationInput): Promise<Notification>
     findById(id: string): Promise<Notification | null>
     findByUserId(userId: string, includeRead?: boolean): Promise<Notification[]>
-    markAsRead(id: string): Promise<Notification>
+    markAsRead(id: string, userId: string): Promise<boolean>
     markAllAsRead(userId: string): Promise<number>
     delete(id: string): Promise<void>
     findRecentByTypeAndTransaction(

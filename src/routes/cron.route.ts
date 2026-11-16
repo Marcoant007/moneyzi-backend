@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { PrismaNotificationRepository } from '@/infra/repositories/prisma/prisma-notification-repository'
 import { PrismaTransactionRepository } from '@/infra/repositories/prisma/prisma-transaction-repository'
 import { CheckDueDatesUseCase } from '@/application/use-cases/notification-use-case/check-due-dates.use-case'
+import { safeEqual } from '@/utils/safe-equal'
 
 export async function cronRoutes(app: FastifyInstance) {
     app.get('/cron/check-due-dates', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -10,7 +11,9 @@ export async function cronRoutes(app: FastifyInstance) {
 
         console.log('🔔 [CRON] Iniciando verificação de vencimentos...')
 
-        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        // Sem CRON_SECRET configurado, recusa (antes "Bearer undefined" passava).
+        const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : undefined
+        if (!safeEqual(authHeader, expected)) {
             console.error('❌ [CRON] Autenticação falhou - Token inválido')
             return reply.status(401).send({ error: 'Unauthorized' })
         }
@@ -58,7 +61,6 @@ export async function cronRoutes(app: FastifyInstance) {
 
             return reply.status(500).send({
                 error: 'Internal server error',
-                message: error instanceof Error ? error.message : 'Unknown error',
                 timestamp: new Date().toISOString(),
             })
         }

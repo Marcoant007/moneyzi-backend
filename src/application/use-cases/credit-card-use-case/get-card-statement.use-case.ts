@@ -16,12 +16,14 @@ export class GetCardStatementUseCase {
   ) {}
 
   async execute(
-    cardId: string, 
-    month: number, 
-    year: number
+    cardId: string,
+    month: number,
+    year: number,
+    userId: string,
   ): Promise<GetCardStatementOutput> {
     const card = await this.creditCardRepository.findById(cardId);
-    if (!card) {
+    // Cartão de outro usuário responde como inexistente.
+    if (!card || card.userId !== userId) {
       throw new Error('Card not found');
     }
     

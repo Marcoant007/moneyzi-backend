@@ -30,6 +30,7 @@ import { PrismaCategoryRepository } from '@/infra/repositories/prisma/prisma-cat
 import { PrismaCategoryUnitOfWork } from '@/infra/repositories/prisma/prisma-category-unit-of-work'
 import { PrismaAccountRepository } from '@/infra/repositories/prisma/prisma-account-repository'
 import { PrismaMcpAuditLogRepository } from '@/infra/repositories/prisma/prisma-mcp-audit-log-repository'
+import { isUserBillingBlocked } from '@/utils/billing-access'
 
 /**
  * Servidor MCP pessoal: qualquer token pessoal válido (ver mcp-bearer-auth.ts,
@@ -47,6 +48,15 @@ export async function mcpRoutes(app: FastifyInstance) {
             const scope = request.mcpScope
             if (!userId || !scope) {
                 return reply.status(401).send({ error: 'Invalid or missing bearer token' })
+            }
+
+            // O paywall do app também vale aqui: sem isso, trial expirado seguia
+            // usando o Moneyzi inteiro pelo ChatGPT/Claude.
+            if (await isUserBillingBlocked(userId)) {
+                return reply.status(402).send({
+                    error: 'subscription_required',
+                    error_description: 'Seu teste gratuito terminou. Assine o Moneyzi para continuar usando a integração.',
+                })
             }
 
             const transactionRepository = new PrismaTransactionRepository()

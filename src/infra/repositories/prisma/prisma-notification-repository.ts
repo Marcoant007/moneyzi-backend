@@ -42,13 +42,13 @@ export class PrismaNotificationRepository implements NotificationRepository {
         return notifications as Notification[]
     }
 
-    async markAsRead(id: string): Promise<Notification> {
-        const notification = await prisma.notification.update({
-            where: { id },
+    async markAsRead(id: string, userId: string): Promise<boolean> {
+        const result = await prisma.notification.updateMany({
+            where: { id, userId },
             data: { isRead: true },
         })
 
-        return notification as Notification
+        return result.count > 0
     }
 
     async markAllAsRead(userId: string): Promise<number> {
