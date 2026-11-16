@@ -13,7 +13,9 @@ function parseOfxDate(value?: string): Date | undefined {
         const y = digits.substring(0, 4)
         const m = digits.substring(4, 6)
         const d = digits.substring(6, 8)
-        return new Date(`${y}-${m}-${d}`)
+        // Meio-dia UTC, igual ao parser de CSV: meia-noite UTC virava o dia
+        // anterior para quem está no Brasil (UTC-3).
+        return new Date(`${y}-${m}-${d}T12:00:00.000Z`)
     }
     return undefined
 }

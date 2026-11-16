@@ -50,7 +50,7 @@ describe('OfxParser', () => {
         const [parsed] = OfxParser.parse(Buffer.from(ofx, 'utf-8'))
 
         expect(parsed.amount).toBeCloseTo(-1234.56)
-        expect(parsed.date).toEqual(new Date('2025-03-15'))
+        expect(parsed.date).toEqual(new Date('2025-03-15T12:00:00.000Z'))
         expect(parsed.name).toBe('Supermercado Extra')
     })
 
@@ -70,7 +70,7 @@ describe('OfxParser', () => {
         const [parsed] = OfxParser.parse(Buffer.from(ofx, 'utf-8'))
 
         expect(parsed.amount).toBeCloseTo(-1234.56)
-        expect(parsed.date).toEqual(new Date('2025-03-15'))
+        expect(parsed.date).toEqual(new Date('2025-03-15T12:00:00.000Z'))
         expect(parsed.name).toBe('Whole Foods Market')
     })
 
@@ -88,7 +88,7 @@ describe('OfxParser', () => {
         const [parsed] = OfxParser.parse(Buffer.from(ofx, 'utf-8'))
 
         expect(parsed.amount).toBeCloseTo(2500.99)
-        expect(parsed.date).toEqual(new Date('2025-07-04'))
+        expect(parsed.date).toEqual(new Date('2025-07-04T12:00:00.000Z'))
     })
 
     it('falls back to MEMO when NAME is absent, regardless of language', () => {
