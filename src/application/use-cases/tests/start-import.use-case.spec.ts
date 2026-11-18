@@ -80,6 +80,28 @@ describe('StartImportUseCase', () => {
         expect(importJobRepository.create).toHaveBeenCalledTimes(1)
     })
 
+    it('returns the job before the AI finishes and marks it FAILED if the background import fails', async () => {
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        importJobRepository.markStatus = vi.fn().mockResolvedValue(undefined)
+        let rejectImport: (error: Error) => void = () => {}
+        vi.mocked(ImportService.import).mockReturnValue(
+            new Promise((_, reject) => {
+                rejectImport = reject
+            }) as any,
+        )
+        const useCase = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)
+
+        // Resolves while ImportService.import is still pending.
+        const { job } = await useCase.execute({ userId: 'user-1', fileBuffer: Buffer.from('x') })
+        expect(job.id).toBe('job-1')
+        expect(importJobRepository.markStatus).not.toHaveBeenCalled()
+
+        rejectImport(new Error('queue down'))
+        await vi.waitFor(() =>
+            expect(importJobRepository.markStatus).toHaveBeenCalledWith('job-1', 'FAILED'),
+        )
+    })
+
     it('defaults region to BR when not provided', async () => {
         const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
         const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)

@@ -85,31 +85,31 @@ export class StartImportUseCase {
             throw new Error('Erro ao criar job de importação: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
         }
 
-        console.log('Starting import process...')
-        try {
-            await ImportService.import(
-                input.fileBuffer,
-                userId,
-                job.id,
-                input.creditCardId,
-                input.isCreditCardInvoice,
-                region,
-            )
-            console.log('Import process started successfully')
-        } catch (error) {
-            console.error('Error starting import process:', error)
-
-            // Sem isso o job fica travado em PROCESSING para sempre quando o envio
-            // para a fila falha (ex.: conexao com RabbitMQ caida) antes de publicar
-            // qualquer mensagem.
-            try {
-                await this.importJobRepository.markStatus(job.id, ImportJobStatus.FAILED)
-            } catch (markError) {
-                console.error('Error marking import job as failed:', markError)
-            }
-
-            throw new Error('Erro ao iniciar processamento: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
-        }
+        // A classificação com IA leva vários segundos. Ela roda depois da resposta:
+        // o app recebe o job na hora e acompanha o status por GET /import/:id, em vez
+        // de deixar o usuário parado no modal esperando a IA terminar.
+        console.log('Starting import process in background...')
+        const jobId = job.id
+        void ImportService.import(
+            input.fileBuffer,
+            userId,
+            jobId,
+            input.creditCardId,
+            input.isCreditCardInvoice,
+            region,
+        )
+            .then(() => console.log('Import process published all rows for job', jobId))
+            .catch(async (error) => {
+                console.error('Error running import process:', error)
+                // Sem isso o job fica travado em PROCESSING para sempre quando o envio
+                // para a fila falha (ex.: conexao com RabbitMQ caida) antes de publicar
+                // qualquer mensagem. O app vê FAILED no polling e avisa o usuário.
+                try {
+                    await this.importJobRepository.markStatus(jobId, ImportJobStatus.FAILED)
+                } catch (markError) {
+                    console.error('Error marking import job as failed:', markError)
+                }
+            })
 
         const dto: ImportJobDto = {
             id: job.id,

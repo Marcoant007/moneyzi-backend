@@ -49,10 +49,31 @@ const INVOICE_PAYMENT_PATTERNS: RegExp[] = [
     /\bpymt\b/,
 ]
 
+// Saldo que veio da fatura ANTERIOR (não paga ou paga parcialmente). Esse valor já
+// foi contado na fatura passada; somar de novo duplica o mês. Ex.: Nubank lança
+// "Valor pendente do mês anterior 383,02" junto do "Pagamento recebido -383,03".
+// Juros/multa/IOF "por fatura atrasada" NÃO entram aqui: são cobranças novas.
+const PREVIOUS_BALANCE_PATTERNS: RegExp[] = [
+    // Nubank: "Valor pendente do mês anterior"
+    /\bvalor pendente\b/,
+    // "Saldo anterior", "Saldo da fatura anterior", "Saldo em atraso", "Saldo devedor anterior"
+    /\bsaldo (anterior|da fatura anterior|fatura anterior|em atraso|devedor anterior|remanescente)\b/,
+    // "Restante da fatura anterior", "Valor da fatura anterior"
+    /\b(restante|valor|debito) da fatura anterior\b/,
+    // EUA: "PREVIOUS BALANCE"
+    /\bprevious balance\b/,
+]
+
 export function isInvoicePaymentDescription(name: unknown): boolean {
     if (typeof name !== 'string' || !name.trim()) return false
     const text = normalizeText(name)
     return INVOICE_PAYMENT_PATTERNS.some((pattern) => pattern.test(text))
+}
+
+export function isPreviousBalanceDescription(name: unknown): boolean {
+    if (typeof name !== 'string' || !name.trim()) return false
+    const text = normalizeText(name)
+    return PREVIOUS_BALANCE_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 function amountOf(row: InvoiceRowLike): number | null {
@@ -62,8 +83,11 @@ function amountOf(row: InvoiceRowLike): number | null {
 export function normalizeCreditCardInvoiceRows<T extends InvoiceRowLike>(
     rows: T[],
 ): NormalizeInvoiceResult<T> {
-    // 1. Pagamento da fatura sai pela descrição, independentemente do sinal.
-    const withoutPayments = rows.filter((row) => !isInvoicePaymentDescription(row.name))
+    // 1. Pagamento da fatura e saldo da fatura anterior saem pela descrição,
+    //    independentemente do sinal.
+    const withoutPayments = rows.filter(
+        (row) => !isInvoicePaymentDescription(row.name) && !isPreviousBalanceDescription(row.name),
+    )
     const removedPayments = rows.length - withoutPayments.length
 
     // 2. Descobre a convenção de sinal do arquivo: numa fatura, compras são a maioria
