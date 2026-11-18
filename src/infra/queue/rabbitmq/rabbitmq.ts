@@ -2,6 +2,7 @@ import * as amqp from 'amqplib'
 import { buildTransactionHandlerChain } from '@/core/handlers/build-transaction-handler'
 import { TransactionMessage } from '@/core/types/transaction-message'
 import { PrismaImportJobRepository } from '@/infra/repositories/prisma/prisma-import-job-repository'
+import { notifyImportFinished } from '@/infra/notifications/import-job-notifier'
 import logger from '@/lib/logger'
 
 let connection: amqp.ChannelModel | undefined
@@ -163,7 +164,9 @@ async function finalizeJob(jobId: string | undefined, didFail: boolean) {
     if (!jobId) return
 
     try {
-        await importJobRepository.registerAttempt(jobId, didFail)
+        const result = await importJobRepository.registerAttempt(jobId, didFail)
+        // Last row of the statement: leave a note in the bell (done or failed).
+        if (result?.finishedNow) await notifyImportFinished(result.job)
     } catch (error) {
         logger.warn({ err: error, jobId, didFail }, 'Nao foi possivel atualizar progresso do ImportJob')
     }

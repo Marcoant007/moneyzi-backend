@@ -102,6 +102,22 @@ describe('StartImportUseCase', () => {
         )
     })
 
+    it('leaves a failure notification when the background import fails', async () => {
+        const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
+        importJobRepository.markStatus = vi.fn().mockResolvedValue(undefined)
+        const notify = vi.fn().mockResolvedValue(undefined)
+        vi.mocked(ImportService.import).mockRejectedValue(new Error('queue down'))
+        const useCase = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository, notify)
+
+        await useCase.execute({ userId: 'user-1', fileBuffer: Buffer.from('x'), creditCardId: 'card-1' })
+
+        await vi.waitFor(() =>
+            expect(notify).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'job-1', userId: 'user-1', status: 'FAILED', creditCardId: 'card-1' }),
+            ),
+        )
+    })
+
     it('defaults region to BR when not provided', async () => {
         const { userRepository, importJobRepository, creditCardRepository } = makeRepositories()
         const sut = new StartImportUseCase(userRepository, importJobRepository, creditCardRepository)

@@ -87,6 +87,8 @@ enum NotificationType {
   BUDGET_ALERT
   MONTHLY_SUMMARY
   PAYMENT_RECEIVED
+  IMPORT_COMPLETED
+  IMPORT_FAILED
 }
 
 enum PaymentStatus {

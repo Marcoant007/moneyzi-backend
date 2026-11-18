@@ -6,12 +6,14 @@ import type { CreditCardRepository } from '@/core/repositories/credit-card-repos
 import { CsvRegion, DEFAULT_CSV_REGION } from '@/core/types/csv-region'
 import { ImportJobStatus } from '@prisma/client'
 import { isQueueReady, QueueUnavailableError } from '@/infra/queue/rabbitmq/rabbitmq'
+import type { ImportJobNotifier } from '@/application/services/import-job-notifier'
 
 export class StartImportUseCase {
     constructor(
         private readonly userRepository: UserRepository,
         private readonly importJobRepository: ImportJobRepository,
         private readonly creditCardRepository: Pick<CreditCardRepository, 'findById'>,
+        private readonly notifyImportFinished?: ImportJobNotifier,
     ) { }
 
     async execute(input: {
@@ -109,6 +111,13 @@ export class StartImportUseCase {
                 } catch (markError) {
                     console.error('Error marking import job as failed:', markError)
                 }
+                await this.notifyImportFinished?.({
+                    id: jobId,
+                    userId,
+                    total: job.total,
+                    status: ImportJobStatus.FAILED,
+                    creditCardId: input.creditCardId,
+                })
             })
 
         const dto: ImportJobDto = {

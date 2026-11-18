@@ -22,7 +22,7 @@ export class PrismaImportJobRepository implements ImportJobRepository {
         })
     }
 
-    async registerAttempt(id: string, didFail: boolean): Promise<ImportJob | null> {
+    async registerAttempt(id: string, didFail: boolean): Promise<{ job: ImportJob; finishedNow: boolean } | null> {
         return prisma.$transaction(async (tx) => {
             const job = await tx.importJob.findUnique({
                 where: { id },
@@ -34,13 +34,15 @@ export class PrismaImportJobRepository implements ImportJobRepository {
 
             const next = resolveImportJobAfterAttempt(job, didFail)
 
-            return tx.importJob.update({
+            const updated = await tx.importJob.update({
                 where: { id },
                 data: {
                     processed: next.processed,
                     status: next.status,
                 },
             })
+            const finishedNow = job.processed < job.total && next.processed >= job.total
+            return { job: updated, finishedNow }
         })
     }
 

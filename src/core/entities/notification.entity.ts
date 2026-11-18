@@ -6,6 +6,8 @@ export enum NotificationType {
     BUDGET_ALERT = 'BUDGET_ALERT',
     MONTHLY_SUMMARY = 'MONTHLY_SUMMARY',
     PAYMENT_RECEIVED = 'PAYMENT_RECEIVED',
+    IMPORT_COMPLETED = 'IMPORT_COMPLETED',
+    IMPORT_FAILED = 'IMPORT_FAILED',
 }
 
 export interface Notification {
