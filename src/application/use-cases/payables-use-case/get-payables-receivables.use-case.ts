@@ -34,6 +34,9 @@ export interface CardStatementItem {
     transactionIds: string[]
     itemCount: number
     importJobId: string | null
+    /** Every import that put transactions in this statement (deleting the
+     *  statement deletes all of them, e.g. when the same file was imported twice). */
+    importJobIds: string[]
 }
 
 export interface PayablesTotals {
@@ -276,6 +279,7 @@ export class GetPayablesReceivablesUseCase {
                 transactionIds: group.transactionIds,
                 itemCount: group.transactionIds.length,
                 importJobId,
+                importJobIds: Array.from(group.importJobIds),
             }
         })
     }
